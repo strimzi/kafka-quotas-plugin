@@ -1,5 +1,27 @@
-# Ignore Gradle project-specific cache directory
-.gradle
+# Maven build targets
+**/target/*
 
-# Ignore Gradle build output directory
-build
+# Maven release files
+*.releaseBackup
+release.properties
+
+# Eclipse specific
+**/.project
+**/.settings/*
+**/.prefs
+**/.classpath
+/target/
+
+# IntelliJ IDEA specific
+.idea/
+*.iml
+
+# VS Code
+.factorypath
+.vscode
+
+# Velocity.log
+velocity.log
+
+# MacOS Desktop Services Store files
+**/.DS_Store

@@ -2,7 +2,7 @@
  * Copyright 2020, Red Hat Inc.
  * License: Apache License 2.0 (see the file LICENSE or http://apache.org/licenses/LICENSE-2.0.html).
  */
-package org.apache.kafka.server.quota;
+package io.strimzi.kafka.quotas;
 
 import java.io.IOException;
 import java.nio.file.FileStore;
@@ -21,6 +21,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
+import org.apache.kafka.server.quota.ClientQuotaCallback;
+import org.apache.kafka.server.quota.ClientQuotaEntity;
+import org.apache.kafka.server.quota.ClientQuotaType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
