@@ -2,11 +2,12 @@
  * Copyright 2020, Red Hat Inc.
  * License: Apache License 2.0 (see the file LICENSE or http://apache.org/licenses/LICENSE-2.0.html).
  */
-package org.apache.kafka.server.quota;
+package io.strimzi.kafka.quotas;
 
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.metrics.Quota;
+import org.apache.kafka.server.quota.ClientQuotaType;
 
 import java.util.HashMap;
 import java.util.Map;

@@ -1,4 +1,9 @@
-# Kafka Static Quota Plugin
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0)
+[![Twitter Follow](https://img.shields.io/twitter/follow/strimziio.svg?style=social&label=Follow&style=for-the-badge)](https://twitter.com/strimziio)
+
+# Kafka Quota Plugin
+
+**This project is based on [https://github.com/lulf/kafka-static-quota-plugin](https://github.com/lulf/kafka-static-quota-plugin) and was originally created by [Ulf Lilleengen](https://github.com/lulf).**
 
 This is a broker quota plugin for Apache Kafka to allow setting a per-broker limits statically in
 the broker configuration. 
@@ -15,15 +20,15 @@ producing messages at 10 MB/second, the second producer will be throttled at 30 
 To build the plugin:
 
 ```
-./gradlew jar
+mvn package
 ```
 
-Copy the resulting jar in `build/libs/kafka-static-quota-plugin-0.1.jar` into the Kafka classpath.
+Copy the resulting jar in `target/kafka-quotas-plugin.jar` into the Kafka classpath.
 
 Alternatively, you can publish to your local maven repository with:
 
 ```
-./gradlew publishMavenJavaPublicationToMavenLocal
+mvn install
 ```
 
 ## Configuring
@@ -31,7 +36,7 @@ Alternatively, you can publish to your local maven repository with:
 Configure Kafka to load the plugin and some plugin properties:
 
 ```
-client.quota.callback.class=org.apache.kafka.server.quota.StaticQuotaCallback
+client.quota.callback.class=io.strimzi.kafka.quotas.StaticQuotaCallback
 
 # The quota is given in bytes, and will translate to bytes/sec in total for your clients.
 client.quota.callback.static.produce=1000000
@@ -45,11 +50,10 @@ client.quota.callback.static.storage.hard=20000000
 client.quota.callback.static.storage.check-interval=5
 ```
 
-
 ## Testing locally
 
 Run it locally (make sure your server.properties enables the reporter):
 
 ```
-CLASSPATH=/path/to/build/libs/kafka-static-quota-plugin-all.jar ./bin/kafka-server-start.sh server.properties
+CLASSPATH=/path/to/target/kafka-quotas-plugin.jar ./bin/kafka-server-start.sh server.properties
 ```
