@@ -112,7 +112,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         private AtomicBoolean running = new AtomicBoolean(false);
 
         void startIfNecessary() {
-            if (running.get() == false) {
+            if (!running.get()) {
                 running.set(true);
                 storageCheckerThread.setDaemon(true);
                 storageCheckerThread.start();
@@ -130,11 +130,10 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             if (StaticQuotaCallback.this.logDirs != null
                     && StaticQuotaCallback.this.storageQuotaSoft > 0
                     && StaticQuotaCallback.this.storageQuotaHard > 0
-                    && StaticQuotaCallback.this.storageCheckInterval > 0)
-            {
+                    && StaticQuotaCallback.this.storageCheckInterval > 0) {
                 try {
                     log.info("Quota Storage Checker is now starting");
-                    while (running.get() == true) {
+                    while (running.get()) {
                         try {
                             long diskUsage = checkDiskUsage();
                             long previousUsage = StaticQuotaCallback.this.storageUsed.getAndSet(diskUsage);
