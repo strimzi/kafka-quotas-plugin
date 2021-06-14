@@ -81,7 +81,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     @Override
     public boolean updateClusterMetadata(Cluster cluster) {
-
         storageChecker.startIfNecessary();
         return false;
     }
@@ -110,28 +109,32 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     private class StorageChecker implements Runnable {
         private final Thread storageCheckerThread = new Thread(this, "storage-quota-checker");
-        private volatile boolean running = false;
+        private AtomicBoolean running = new AtomicBoolean(false);
 
         void startIfNecessary() {
-            if (!running) {
-                running = true;
+            if (running.get() == false) {
+                running.set(true);
                 storageCheckerThread.setDaemon(true);
                 storageCheckerThread.start();
             }
         }
 
         void stop() throws InterruptedException {
-            running = false;
+            running.set(false);
             storageCheckerThread.interrupt();
             storageCheckerThread.join();
         }
 
         @Override
         public void run() {
-            if (StaticQuotaCallback.this.logDirs != null && StaticQuotaCallback.this.storageQuotaSoft > 0 && StaticQuotaCallback.this.storageQuotaHard > 0 && StaticQuotaCallback.this.storageCheckInterval > 0) {
+            if (StaticQuotaCallback.this.logDirs != null
+                    && StaticQuotaCallback.this.storageQuotaSoft > 0
+                    && StaticQuotaCallback.this.storageQuotaHard > 0
+                    && StaticQuotaCallback.this.storageCheckInterval > 0)
+            {
                 try {
                     log.info("Quota Storage Checker is now starting");
-                    while (running) {
+                    while (running.get() == true) {
                         try {
                             long diskUsage = checkDiskUsage();
                             long previousUsage = StaticQuotaCallback.this.storageUsed.getAndSet(diskUsage);
