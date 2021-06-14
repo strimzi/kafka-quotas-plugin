@@ -27,6 +27,10 @@ import org.apache.kafka.server.quota.ClientQuotaType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.yammer.metrics.core.Gauge;
+
+import kafka.metrics.KafkaYammerMetrics;
+
 /**
  * Allows configuring generic quotas for a broker independent of users and clients.
  */
@@ -40,6 +44,16 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private volatile int storageCheckInterval = Integer.MAX_VALUE;
     private final AtomicBoolean resetQuota = new AtomicBoolean(false);
     private final StorageChecker storageChecker = new StorageChecker();
+    private final Gauge limitBytes = KafkaYammerMetrics.defaultRegistry().newGauge(StaticQuotaCallback.class, "LimitBytes", new Gauge<Long>() {
+        public Long value() {
+            return storageQuotaSoft;
+        }
+    });
+    private final Gauge usedBytes = KafkaYammerMetrics.defaultRegistry().newGauge(StaticQuotaCallback.class, "UsedBytes", new Gauge<Long>() {
+        public Long value() {
+            return storageUsed.get();
+        }
+    });
 
     @Override
     public Map<String, String> quotaMetricTags(ClientQuotaType quotaType, KafkaPrincipal principal, String clientId) {
