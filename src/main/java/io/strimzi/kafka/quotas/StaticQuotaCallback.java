@@ -18,6 +18,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Metric;
+import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.Gauge;
+
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
@@ -26,10 +31,6 @@ import org.apache.kafka.server.quota.ClientQuotaEntity;
 import org.apache.kafka.server.quota.ClientQuotaType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.yammer.metrics.core.Gauge;
-
-import kafka.metrics.KafkaYammerMetrics;
 
 /**
  * Allows configuring generic quotas for a broker independent of users and clients.
@@ -44,16 +45,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private volatile int storageCheckInterval = Integer.MAX_VALUE;
     private final AtomicBoolean resetQuota = new AtomicBoolean(false);
     private final StorageChecker storageChecker = new StorageChecker();
-    private final Gauge limitBytes = KafkaYammerMetrics.defaultRegistry().newGauge(StaticQuotaCallback.class, "LimitBytes", new Gauge<Long>() {
-        public Long value() {
-            return storageQuotaSoft;
-        }
-    });
-    private final Gauge usedBytes = KafkaYammerMetrics.defaultRegistry().newGauge(StaticQuotaCallback.class, "UsedBytes", new Gauge<Long>() {
-        public Long value() {
-            return storageUsed.get();
-        }
-    });
 
     @Override
     public Map<String, String> quotaMetricTags(ClientQuotaType quotaType, KafkaPrincipal principal, String clientId) {
@@ -124,6 +115,25 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private class StorageChecker implements Runnable {
         private final Thread storageCheckerThread = new Thread(this, "storage-quota-checker");
         private volatile boolean running = false;
+        private final Metric kafkaBrokerAllUsedBytes = Metrics.newGauge(mNameCreate("AllUsedBytes"), new Gauge<Long>() {
+            public Long value() {
+                return storageUsed.get();
+            }
+        });
+        private final Metric getKafkaBrokerSoftLimitBytes = Metrics.newGauge(mNameCreate("SoftLimitBytes"), new Gauge<Long>() {
+            public Long value() {
+                return storageQuotaSoft;
+            }
+        });
+
+        private MetricName mNameCreate(String name) {
+            MetricName metricName = new MetricName(StaticQuotaCallback.class, name);
+            return new MetricName(metricName.getGroup(),
+                    metricName.getType(),
+                    metricName.getName(),
+                    metricName.getScope(),
+                    metricName.getMBeanName().replace("\"", ""));
+        }
 
         void start() {
             if (!running) {
@@ -150,6 +160,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
                         }
                         log.debug("Storage usage checked: {}", StaticQuotaCallback.this.storageUsed.get());
                         Thread.sleep(TimeUnit.SECONDS.toMillis(StaticQuotaCallback.this.storageCheckInterval));
+                        //log.info("$$$$$$$$$$$$$$$$$$$$$$$$$$$ {}", StaticQuotaCallback.this.metricName.getScope());
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
