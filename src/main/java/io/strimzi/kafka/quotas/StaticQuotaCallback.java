@@ -115,18 +115,18 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private class StorageChecker implements Runnable {
         private final Thread storageCheckerThread = new Thread(this, "storage-quota-checker");
         private volatile boolean running = false;
-        private final Metric kafkaBrokerAllUsedBytes = Metrics.newGauge(mNameCreate("AllUsedBytes"), new Gauge<Long>() {
+        private final Metric kafkaBrokerAllUsedBytes = Metrics.newGauge(metricName("TotalStorageUsedBytes"), new Gauge<Long>() {
             public Long value() {
                 return storageUsed.get();
             }
         });
-        private final Metric getKafkaBrokerSoftLimitBytes = Metrics.newGauge(mNameCreate("SoftLimitBytes"), new Gauge<Long>() {
+        private final Metric getKafkaBrokerSoftLimitBytes = Metrics.newGauge(metricName("SoftLimitBytes"), new Gauge<Long>() {
             public Long value() {
                 return storageQuotaSoft;
             }
         });
 
-        private MetricName mNameCreate(String name) {
+        private MetricName metricName(String name) {
             MetricName metricName = new MetricName(StaticQuotaCallback.class, name);
             return new MetricName(metricName.getGroup(),
                     metricName.getType(),
