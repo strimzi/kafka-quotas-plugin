@@ -112,8 +112,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         private AtomicBoolean running = new AtomicBoolean(false);
 
         void startIfNecessary() {
-            if (!running.get()) {
-                running.set(true);
+            if (running.compareAndSet(false, true)) {
                 storageCheckerThread.setDaemon(true);
                 storageCheckerThread.start();
             }
