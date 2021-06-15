@@ -160,7 +160,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
                         }
                         log.debug("Storage usage checked: {}", StaticQuotaCallback.this.storageUsed.get());
                         Thread.sleep(TimeUnit.SECONDS.toMillis(StaticQuotaCallback.this.storageCheckInterval));
-                        //log.info("$$$$$$$$$$$$$$$$$$$$$$$$$$$ {}", StaticQuotaCallback.this.metricName.getScope());
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
