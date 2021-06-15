@@ -81,6 +81,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     @Override
     public boolean updateClusterMetadata(Cluster cluster) {
+        storageChecker.startIfNecessary();
         return false;
     }
 
@@ -103,47 +104,53 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         storageCheckInterval = config.getStorageCheckInterval();
         logDirs = config.getLogDirs();
 
-        storageChecker.start();
         log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckInterval);
     }
 
     private class StorageChecker implements Runnable {
         private final Thread storageCheckerThread = new Thread(this, "storage-quota-checker");
-        private volatile boolean running = false;
+        private AtomicBoolean running = new AtomicBoolean(false);
 
-        void start() {
-            if (!running) {
-                running = true;
+        void startIfNecessary() {
+            if (running.compareAndSet(false, true)) {
+                storageCheckerThread.setDaemon(true);
                 storageCheckerThread.start();
             }
         }
 
         void stop() throws InterruptedException {
-            running = false;
+            running.set(false);
             storageCheckerThread.interrupt();
             storageCheckerThread.join();
         }
 
         @Override
         public void run() {
-            if (StaticQuotaCallback.this.logDirs != null && StaticQuotaCallback.this.storageQuotaSoft > 0 && StaticQuotaCallback.this.storageQuotaHard > 0 && StaticQuotaCallback.this.storageCheckInterval > 0) {
-                while (running) {
-                    try {
-                        long diskUsage = checkDiskUsage();
-                        long previousUsage = StaticQuotaCallback.this.storageUsed.getAndSet(diskUsage);
-                        if (diskUsage != previousUsage) {
-                            StaticQuotaCallback.this.resetQuota.set(true);
+            if (StaticQuotaCallback.this.logDirs != null
+                    && StaticQuotaCallback.this.storageQuotaSoft > 0
+                    && StaticQuotaCallback.this.storageQuotaHard > 0
+                    && StaticQuotaCallback.this.storageCheckInterval > 0) {
+                try {
+                    log.info("Quota Storage Checker is now starting");
+                    while (running.get()) {
+                        try {
+                            long diskUsage = checkDiskUsage();
+                            long previousUsage = StaticQuotaCallback.this.storageUsed.getAndSet(diskUsage);
+                            if (diskUsage != previousUsage) {
+                                StaticQuotaCallback.this.resetQuota.set(true);
+                            }
+                            log.debug("Storage usage checked: {}", StaticQuotaCallback.this.storageUsed.get());
+                            Thread.sleep(TimeUnit.SECONDS.toMillis(StaticQuotaCallback.this.storageCheckInterval));
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        } catch (Exception e) {
+                            log.warn("Exception in storage checker thread", e);
                         }
-                        log.debug("Storage usage checked: {}", StaticQuotaCallback.this.storageUsed.get());
-                        Thread.sleep(TimeUnit.SECONDS.toMillis(StaticQuotaCallback.this.storageCheckInterval));
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    } catch (Exception e) {
-                        log.warn("Exception in storage checker thread", e);
                     }
+                } finally {
+                    log.info("Quota Storage Checker is now finishing");
                 }
-
             }
         }
 
