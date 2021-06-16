@@ -19,7 +19,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.Metric;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.Gauge;
 
@@ -115,16 +114,19 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private class StorageChecker implements Runnable {
         private final Thread storageCheckerThread = new Thread(this, "storage-quota-checker");
         private AtomicBoolean running = new AtomicBoolean(false);
-        private final Metric kafkaBrokerAllUsedBytes = Metrics.newGauge(metricName("TotalStorageUsedBytes"), new Gauge<Long>() {
-            public Long value() {
-                return storageUsed.get();
-            }
-        });
-        private final Metric getKafkaBrokerSoftLimitBytes = Metrics.newGauge(metricName("SoftLimitBytes"), new Gauge<Long>() {
-            public Long value() {
-                return storageQuotaSoft;
-            }
-        });
+
+        void createCustomMetrics() {
+            Metrics.newGauge(metricName("TotalStorageUsedBytes"), new Gauge<Long>() {
+                public Long value() {
+                    return storageUsed.get();
+                }
+            });
+            Metrics.newGauge(metricName("SoftLimitBytes"), new Gauge<Long>() {
+                public Long value() {
+                    return storageQuotaSoft;
+                }
+            });
+        }
 
         private MetricName metricName(String name) {
             MetricName metricName = new MetricName(StaticQuotaCallback.class, name);
@@ -137,6 +139,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
         void startIfNecessary() {
             if (running.compareAndSet(false, true)) {
+                createCustomMetrics();
                 storageCheckerThread.setDaemon(true);
                 storageCheckerThread.start();
             }
