@@ -114,8 +114,10 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private class StorageChecker implements Runnable {
         private final Thread storageCheckerThread = new Thread(this, "storage-quota-checker");
         private AtomicBoolean running = new AtomicBoolean(false);
+        private String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
         void createCustomMetrics() {
+
             Metrics.newGauge(metricName("TotalStorageUsedBytes"), new Gauge<Long>() {
                 public Long value() {
                     return storageUsed.get();
@@ -129,12 +131,9 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
 
         private MetricName metricName(String name) {
-            MetricName metricName = new MetricName(StaticQuotaCallback.class, name);
-            return new MetricName(metricName.getGroup(),
-                    metricName.getType(),
-                    metricName.getName(),
-                    metricName.getScope(),
-                    metricName.getMBeanName().replace("\"", ""));
+
+            String mBeanName = "io.strimzi.kafka.quotas:type=StorageChecker,name=" + name + "";
+            return new MetricName("io.strimzi.kafka.quotas", "StorageChecker", name, this.scope, mBeanName);
         }
 
         void startIfNecessary() {
