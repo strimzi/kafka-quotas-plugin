@@ -18,6 +18,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.Gauge;
+
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
@@ -110,9 +114,31 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private class StorageChecker implements Runnable {
         private final Thread storageCheckerThread = new Thread(this, "storage-quota-checker");
         private AtomicBoolean running = new AtomicBoolean(false);
+        private String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
+
+        private void createCustomMetrics() {
+
+            Metrics.newGauge(metricName("TotalStorageUsedBytes"), new Gauge<Long>() {
+                public Long value() {
+                    return storageUsed.get();
+                }
+            });
+            Metrics.newGauge(metricName("SoftLimitBytes"), new Gauge<Long>() {
+                public Long value() {
+                    return storageQuotaSoft;
+                }
+            });
+        }
+
+        private MetricName metricName(String name) {
+
+            String mBeanName = "io.strimzi.kafka.quotas:type=StorageChecker,name=" + name + "";
+            return new MetricName("io.strimzi.kafka.quotas", "StorageChecker", name, this.scope, mBeanName);
+        }
 
         void startIfNecessary() {
             if (running.compareAndSet(false, true)) {
+                createCustomMetrics();
                 storageCheckerThread.setDaemon(true);
                 storageCheckerThread.start();
             }
