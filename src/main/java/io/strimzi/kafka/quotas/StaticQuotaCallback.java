@@ -116,7 +116,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         private AtomicBoolean running = new AtomicBoolean(false);
         private String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
-        void createCustomMetrics() {
+        private void createCustomMetrics() {
 
             Metrics.newGauge(metricName("TotalStorageUsedBytes"), new Gauge<Long>() {
                 public Long value() {
