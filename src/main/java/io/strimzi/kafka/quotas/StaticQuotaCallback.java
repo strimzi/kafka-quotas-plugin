@@ -5,22 +5,19 @@
 package io.strimzi.kafka.quotas;
 
 import java.io.IOException;
-import java.nio.file.FileStore;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.Gauge;
+import com.yammer.metrics.core.MetricName;
 
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.metrics.Quota;
@@ -43,7 +40,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private volatile long storageQuotaHard = Long.MAX_VALUE;
     private volatile int storageCheckInterval = Integer.MAX_VALUE;
     private final AtomicBoolean resetQuota = new AtomicBoolean(false);
-    private final StorageChecker storageChecker = new StorageChecker();
+    final StorageChecker storageChecker = new StorageChecker();
 
     @Override
     public Map<String, String> quotaMetricTags(ClientQuotaType quotaType, KafkaPrincipal principal, String clientId) {
@@ -111,7 +108,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckInterval);
     }
 
-    private class StorageChecker implements Runnable {
+    class StorageChecker implements Runnable {
         private final Thread storageCheckerThread = new Thread(this, "storage-quota-checker");
         private AtomicBoolean running = new AtomicBoolean(false);
         private String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
@@ -180,20 +177,27 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             }
         }
 
-        private long checkDiskUsage() throws IOException, InterruptedException {
-            List<String> dirList = Arrays.asList(logDirs.split(","));
-            Set<FileStore> fileStores = new HashSet<>();
-            for (String d : dirList) {
-                fileStores.add(Files.getFileStore(Paths.get(d)));
-            }
-
-            long totalUsed = 0;
-            for (FileStore store : fileStores) {
-                long used = store.getTotalSpace() - store.getUsableSpace();
-                totalUsed = totalUsed + used;
-            }
-
-            return totalUsed;
+        long checkDiskUsage() {
+            return Arrays.stream(logDirs.split(","))
+                .map(Paths::get)
+                .filter(Files::exists)
+                .map(path -> apply(() -> Files.getFileStore(path)))
+                .distinct()
+                .mapToLong(store -> apply(() -> store.getTotalSpace() - store.getUsableSpace()))
+                .sum();
         }
+    }
+
+    static <T> T apply(IOSupplier<T> supplier) {
+        try {
+            return supplier.get();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @FunctionalInterface
+    interface IOSupplier<T> {
+        T get() throws IOException;
     }
 }
