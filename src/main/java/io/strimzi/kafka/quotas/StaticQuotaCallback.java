@@ -62,16 +62,10 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage > storageQuotaSoft && currentStorageUsage < storageQuotaHard) {
             double minThrottle = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
             double limit = minThrottle * (1.0 - (1.0 * (currentStorageUsage - storageQuotaSoft) / (storageQuotaHard - storageQuotaSoft)));
-            if (shouldLog(this.lastLoggedMessageSoftTimeMs)) {
-                log.debug("Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
-                this.lastLoggedMessageSoftTimeMs = System.currentTimeMillis();
-            }
+            maybeLogSoft("Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
             return limit;
         } else if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage >= storageQuotaHard) {
-            if (shouldLog(this.lastLoggedMessageHardTimeMs)) {
-                log.debug("Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
-                this.lastLoggedMessageHardTimeMs = System.currentTimeMillis();
-            }
+            maybeLogHard("Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
             return 1.0;
         }
         return quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
@@ -79,11 +73,19 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     /**
      * Put a small delay between logging
-     * @param lastLoggedMessageTimeMs the last time the logger logged
-     * @return true when the logger is supposed to log again
      */
-    private boolean shouldLog(long lastLoggedMessageTimeMs) {
-        return System.currentTimeMillis() - lastLoggedMessageTimeMs >= LOGGING_DELAY_MS;
+    private void maybeLogSoft(String format, Object... args) {
+        if (System.currentTimeMillis() - lastLoggedMessageSoftTimeMs >= LOGGING_DELAY_MS) {
+            log.debug(format, args);
+            this.lastLoggedMessageSoftTimeMs = System.currentTimeMillis();
+        }
+    }
+
+    private void maybeLogHard(String format, Object... args) {
+        if (System.currentTimeMillis() - lastLoggedMessageHardTimeMs >= LOGGING_DELAY_MS) {
+            log.debug(format, args);
+            this.lastLoggedMessageHardTimeMs = System.currentTimeMillis();
+        }
     }
 
     @Override
