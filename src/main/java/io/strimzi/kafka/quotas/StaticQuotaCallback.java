@@ -44,6 +44,8 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private volatile int storageCheckInterval = Integer.MAX_VALUE;
     private final AtomicBoolean resetQuota = new AtomicBoolean(false);
     final StorageChecker storageChecker = new StorageChecker();
+    private final static long LOGGING_DELAY_MS = 1000;
+    private long lastLoggedMessageTimeMs = 0;
 
     @Override
     public Map<String, String> quotaMetricTags(ClientQuotaType quotaType, KafkaPrincipal principal, String clientId) {
@@ -59,13 +61,29 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage > storageQuotaSoft && currentStorageUsage < storageQuotaHard) {
             double minThrottle = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
             double limit = minThrottle * (1.0 - (1.0 * (currentStorageUsage - storageQuotaSoft) / (storageQuotaHard - storageQuotaSoft)));
-            log.trace("Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
+            if (shouldLog()) {
+                log.debug("Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
+            }
             return limit;
         } else if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage >= storageQuotaHard) {
-            log.trace("Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
+            if (shouldLog()) {
+                log.debug("Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
+            }
             return 1.0;
         }
         return quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
+    }
+
+    /**
+     * Put a small delay between logging
+     */
+    private boolean shouldLog() {
+        if (System.currentTimeMillis() - lastLoggedMessageTimeMs  < LOGGING_DELAY_MS) {
+            return false;
+        } else {
+            lastLoggedMessageTimeMs = System.currentTimeMillis();
+            return true;
+        }
     }
 
     @Override
