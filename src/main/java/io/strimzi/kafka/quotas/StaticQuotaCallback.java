@@ -45,8 +45,8 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final AtomicBoolean resetQuota = new AtomicBoolean(false);
     final StorageChecker storageChecker = new StorageChecker();
     private final static long LOGGING_DELAY_MS = 1000;
-    private long lastLoggedMessageSoftTimeMs = 0;
-    private long lastLoggedMessageHardTimeMs = 0;
+    private AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
+    private AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
 
     @Override
     public Map<String, String> quotaMetricTags(ClientQuotaType quotaType, KafkaPrincipal principal, String clientId) {
@@ -62,10 +62,10 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage > storageQuotaSoft && currentStorageUsage < storageQuotaHard) {
             double minThrottle = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
             double limit = minThrottle * (1.0 - (1.0 * (currentStorageUsage - storageQuotaSoft) / (storageQuotaHard - storageQuotaSoft)));
-            maybeLogSoft("Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
+            maybeLog(lastLoggedMessageSoftTimeMs, "Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
             return limit;
         } else if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage >= storageQuotaHard) {
-            maybeLogHard("Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
+            maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
             return 1.0;
         }
         return quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
@@ -74,17 +74,10 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     /**
      * Put a small delay between logging
      */
-    private void maybeLogSoft(String format, Object... args) {
-        if (System.currentTimeMillis() - lastLoggedMessageSoftTimeMs >= LOGGING_DELAY_MS) {
+    private void maybeLog(AtomicLong latLoggedMessageTimeMs, String format, Object... args) {
+        if (System.currentTimeMillis() - latLoggedMessageTimeMs.get() >= LOGGING_DELAY_MS) {
             log.debug(format, args);
-            this.lastLoggedMessageSoftTimeMs = System.currentTimeMillis();
-        }
-    }
-
-    private void maybeLogHard(String format, Object... args) {
-        if (System.currentTimeMillis() - lastLoggedMessageHardTimeMs >= LOGGING_DELAY_MS) {
-            log.debug(format, args);
-            this.lastLoggedMessageHardTimeMs = System.currentTimeMillis();
+            latLoggedMessageTimeMs.set(System.currentTimeMillis());
         }
     }
 
