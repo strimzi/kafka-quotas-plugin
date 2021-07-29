@@ -75,9 +75,10 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
      * Put a small delay between logging
      */
     private void maybeLog(AtomicLong latLoggedMessageTimeMs, String format, Object... args) {
-        if (System.currentTimeMillis() - latLoggedMessageTimeMs.get() >= LOGGING_DELAY_MS) {
+        long now = System.currentTimeMillis();
+        if (now - latLoggedMessageTimeMs.get() >= LOGGING_DELAY_MS) {
             log.debug(format, args);
-            latLoggedMessageTimeMs.set(System.currentTimeMillis());
+            latLoggedMessageTimeMs.set(now);
         }
     }
 
