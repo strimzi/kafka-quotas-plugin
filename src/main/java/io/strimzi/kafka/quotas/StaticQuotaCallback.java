@@ -44,6 +44,9 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private volatile int storageCheckInterval = Integer.MAX_VALUE;
     private final AtomicBoolean resetQuota = new AtomicBoolean(false);
     final StorageChecker storageChecker = new StorageChecker();
+    private final static long LOGGING_DELAY_MS = 1000;
+    private AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
+    private AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
 
     @Override
     public Map<String, String> quotaMetricTags(ClientQuotaType quotaType, KafkaPrincipal principal, String clientId) {
@@ -59,13 +62,34 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage > storageQuotaSoft && currentStorageUsage < storageQuotaHard) {
             double minThrottle = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
             double limit = minThrottle * (1.0 - (1.0 * (currentStorageUsage - storageQuotaSoft) / (storageQuotaHard - storageQuotaSoft)));
-            log.debug("Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
+            maybeLog(lastLoggedMessageSoftTimeMs, "Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
             return limit;
         } else if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage >= storageQuotaHard) {
-            log.debug("Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
+            maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
             return 1.0;
         }
         return quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
+    }
+
+    /**
+     * Put a small delay between logging
+     */
+    private void maybeLog(AtomicLong lastLoggedMessageTimeMs, String format, Object... args) {
+        if (log.isDebugEnabled()) {
+            long now = System.currentTimeMillis();
+            final boolean[] shouldLog = {true};
+            lastLoggedMessageTimeMs.getAndUpdate(current -> {
+                if (now - current >= LOGGING_DELAY_MS) {
+                    shouldLog[0] = true;
+                    return now;
+                }
+                shouldLog[0] = false;
+                return current;
+            });
+            if (shouldLog[0]) {
+                log.debug(format, args);
+            }
+        }
     }
 
     @Override
