@@ -16,6 +16,8 @@ quota of 40 MB/second, and you have 10 producers running as fast as possible, th
 The quota distribution across clients is not static. If you have a max of 40 MB/second, 2 producers, and one of them is 
 producing messages at 10 MB/second, the second producer will be throttled at 30 MB/second.
 
+The plugin first checks per volume quota, and then total quota.
+
 ## Building
 
 To build the plugin:
@@ -43,8 +45,12 @@ client.quota.callback.class=io.strimzi.kafka.quotas.StaticQuotaCallback
 client.quota.callback.static.produce=1000000
 client.quota.callback.static.fetch=1000000
 
+# Configure percent usage for each distinct volume. 
+# The format per volume is <log_directory>;<soft percent limit>;<hard percent limit>, where you separate distinct volumes with `|`. 
+client.quota.callback.static.storage.percentages=/var/kafka/disk-0;70;99|/var/kafka/disk-1;80;95
 # Storage quota settings in bytes. Clients will be throttled linearly between produce quota and 0
 # after soft limit.
+# Per volume check is performed before volume sum check.
 client.quota.callback.static.storage.soft=10000000
 client.quota.callback.static.storage.hard=20000000
 # Check storage usage every 5 seconds

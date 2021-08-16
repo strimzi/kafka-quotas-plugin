@@ -6,16 +6,19 @@ package io.strimzi.kafka.quotas;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import com.yammer.metrics.Metrics;
@@ -23,6 +26,7 @@ import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricName;
 
 import org.apache.kafka.common.Cluster;
+import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.apache.kafka.server.quota.ClientQuotaCallback;
@@ -38,15 +42,18 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private static final Logger log = LoggerFactory.getLogger(StaticQuotaCallback.class);
     private volatile Map<ClientQuotaType, Quota> quotaMap = new HashMap<>();
     private final AtomicLong storageUsed = new AtomicLong(0);
+    private final AtomicReference<Map<FileStore, Double>> storagePercentages = new AtomicReference<>(Collections.emptyMap());
     private volatile List<Path> logDirs;
+    private volatile Map<FileStore, Threshold> thresholdMap = Map.of(); // start with empty, so we don't get NPE
     private volatile long storageQuotaSoft = Long.MAX_VALUE;
     private volatile long storageQuotaHard = Long.MAX_VALUE;
     private volatile int storageCheckInterval = Integer.MAX_VALUE;
     private final AtomicBoolean resetQuota = new AtomicBoolean(false);
     final StorageChecker storageChecker = new StorageChecker();
     private final static long LOGGING_DELAY_MS = 1000;
-    private AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
-    private AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
+    private final AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
+    private final AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
+    private final AtomicLong lastLoggedMessagePercentTimeMs = new AtomicLong(0);
 
     @Override
     public Map<String, String> quotaMetricTags(ClientQuotaType quotaType, KafkaPrincipal principal, String clientId) {
@@ -57,18 +64,38 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     @Override
     public Double quotaLimit(ClientQuotaType quotaType, Map<String, String> metricTags) {
+        double throttle = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
         // Don't allow producing messages if we're beyond the storage limit.
-        long currentStorageUsage = storageUsed.get();
-        if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage > storageQuotaSoft && currentStorageUsage < storageQuotaHard) {
-            double minThrottle = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
-            double limit = minThrottle * (1.0 - (1.0 * (currentStorageUsage - storageQuotaSoft) / (storageQuotaHard - storageQuotaSoft)));
-            maybeLog(lastLoggedMessageSoftTimeMs, "Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
-            return limit;
-        } else if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage >= storageQuotaHard) {
-            maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
-            return 1.0;
+        if (ClientQuotaType.PRODUCE.equals(quotaType)) {
+            Map<FileStore, Double> volumePercents = storagePercentages.get();
+            for (Map.Entry<FileStore, Double> entry : volumePercents.entrySet()) {
+                Threshold threshold = thresholdMap.get(entry.getKey());
+                if (threshold != null) {
+                    Double currentPercent = entry.getValue();
+                    Double softPercent = threshold.soft;
+                    Double hardPercent = threshold.hard;
+                    if (currentPercent >= hardPercent) {
+                        maybeLog(lastLoggedMessagePercentTimeMs, "Limiting producer rate because a volume is full. Used percent: {}. Limit percent: {}", currentPercent, hardPercent);
+                        return 1.0;
+                    } else if (currentPercent > softPercent) {
+                        double limit = throttle * (1.0 - ((currentPercent - softPercent) / (hardPercent - softPercent)));
+                        maybeLog(lastLoggedMessagePercentTimeMs, "Throttling producer rate because disk is beyond soft percent limit. Used percent: {}. Quota: {}", currentPercent, limit);
+                        return limit;
+                    }
+                }
+            }
+
+            long currentStorageUsage = storageUsed.get();
+            if (currentStorageUsage >= storageQuotaHard) {
+                maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
+                return 1.0;
+            } else if (currentStorageUsage > storageQuotaSoft) {
+                double limit = throttle * (1.0 - (1.0 * (currentStorageUsage - storageQuotaSoft) / (storageQuotaHard - storageQuotaSoft)));
+                maybeLog(lastLoggedMessageSoftTimeMs, "Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
+                return limit;
+            }
         }
-        return quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
+        return throttle;
     }
 
     /**
@@ -129,19 +156,58 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         quotaMap = config.getQuotaMap();
         storageQuotaSoft = config.getSoftStorageQuota();
         storageQuotaHard = config.getHardStorageQuota();
+        if (storageQuotaSoft > storageQuotaHard) {
+            throw new InvalidConfigurationException("Soft limit is bigger than hard limit");
+        }
         storageCheckInterval = config.getStorageCheckInterval();
+        if (storageCheckInterval < 0) {
+            throw new InvalidConfigurationException("Check interval cannot be negative");
+        }
         logDirs = Arrays.stream(config.getLogDirs().split(",")).map(Paths::get).collect(Collectors.toList());
+        Map<FileStore, Threshold> tmp = new HashMap<>();
+        String percents = config.getStoragePercents();
+        String[] split = percents.split("\\|");
+        for (String s : split) {
+            String[] inner = s.split(";");
+            Path path = Paths.get(inner[0]);
+            if (!logDirs.contains(path)) {
+                throw new InvalidConfigurationException(StaticQuotaConfig.STORAGE_QUOTA_PERCENTAGES_PROP + " property contains path that's not part of logDirs: " + path + " - " + logDirs);
+            }
+            double soft = Double.parseDouble(inner[1]);
+            double hard = Double.parseDouble(inner[2]);
+            if ((soft < 0) || (hard < 0) || (hard <= soft) || (soft > 100) || (hard > 100)) {
+                throw new InvalidConfigurationException("Invalid soft or hard percent limit: " + s);
+            }
+            FileStore store = apply(() -> Files.getFileStore(path));
+            tmp.compute(store, (f, e) -> {
+                if (e == null) {
+                    return new Threshold(soft, hard);
+                } else {
+                    log.warn("Duplicate volume found: " + f);
+                    return new Threshold(Math.min(e.soft, soft), Math.max(e.hard, hard));
+                }
+            });
+        }
+        thresholdMap = tmp;
+        log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Percents map: {}. Storage check interval: {}", quotaMap, storageQuotaSoft, storageQuotaHard, thresholdMap, storageCheckInterval);
+    }
 
-        log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckInterval);
+    private final static class Threshold {
+        final double soft;
+        final double hard;
+
+        public Threshold(double soft, double hard) {
+            this.soft = soft;
+            this.hard = hard;
+        }
     }
 
     class StorageChecker implements Runnable {
         private final Thread storageCheckerThread = new Thread(this, "storage-quota-checker");
-        private AtomicBoolean running = new AtomicBoolean(false);
-        private String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
+        private final AtomicBoolean running = new AtomicBoolean(false);
+        private final String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
         private void createCustomMetrics() {
-
             Metrics.newGauge(metricName("TotalStorageUsedBytes"), new Gauge<Long>() {
                 public Long value() {
                     return storageUsed.get();
@@ -155,7 +221,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
 
         private MetricName metricName(String name) {
-
             String mBeanName = "io.strimzi.kafka.quotas:type=StorageChecker,name=" + name + "";
             return new MetricName("io.strimzi.kafka.quotas", "StorageChecker", name, this.scope, mBeanName);
         }
@@ -177,14 +242,16 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         @Override
         public void run() {
             if (StaticQuotaCallback.this.logDirs != null
-                    && StaticQuotaCallback.this.storageQuotaSoft > 0
-                    && StaticQuotaCallback.this.storageQuotaHard > 0
-                    && StaticQuotaCallback.this.storageCheckInterval > 0) {
+                && StaticQuotaCallback.this.storageQuotaSoft > 0
+                && StaticQuotaCallback.this.storageQuotaHard > 0
+                && StaticQuotaCallback.this.storageCheckInterval > 0) {
                 try {
                     log.info("Quota Storage Checker is now starting");
                     while (running.get()) {
                         try {
-                            long diskUsage = checkDiskUsage();
+                            Map<FileStore, Double> volumePercents = new HashMap<>();
+                            long diskUsage = checkDiskUsage(volumePercents);
+                            storagePercentages.set(volumePercents);
                             long previousUsage = StaticQuotaCallback.this.storageUsed.getAndSet(diskUsage);
                             if (diskUsage != previousUsage) {
                                 StaticQuotaCallback.this.resetQuota.set(true);
@@ -204,12 +271,22 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             }
         }
 
-        long checkDiskUsage() {
+        long checkDiskUsage(Map<FileStore, Double> volumePercents) {
             return logDirs.stream()
                 .filter(Files::exists)
                 .map(path -> apply(() -> Files.getFileStore(path)))
                 .distinct()
-                .mapToLong(store -> apply(() -> store.getTotalSpace() - store.getUsableSpace()))
+                .mapToLong(store -> {
+                    try {
+                        long usableSpace = store.getUsableSpace();
+                        long totalSpace = store.getTotalSpace();
+                        long usedSpace = totalSpace - usableSpace;
+                        volumePercents.put(store, 100.0 * usedSpace / totalSpace);
+                        return usedSpace;
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                })
                 .sum();
         }
     }

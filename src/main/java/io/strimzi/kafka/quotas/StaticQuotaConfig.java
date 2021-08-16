@@ -6,11 +6,13 @@ package io.strimzi.kafka.quotas;
 
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.server.quota.ClientQuotaType;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import static org.apache.kafka.common.config.ConfigDef.Importance.HIGH;
 import static org.apache.kafka.common.config.ConfigDef.Importance.MEDIUM;
@@ -20,13 +22,14 @@ import static org.apache.kafka.common.config.ConfigDef.Type.LONG;
 import static org.apache.kafka.common.config.ConfigDef.Type.STRING;
 
 public class StaticQuotaConfig extends AbstractConfig {
-    private static final String PRODUCE_QUOTA_PROP = "client.quota.callback.static.produce";
-    private static final String FETCH_QUOTA_PROP = "client.quota.callback.static.fetch";
-    private static final String REQUEST_QUOTA_PROP = "client.quota.callback.static.request";
-    private static final String STORAGE_QUOTA_SOFT_PROP = "client.quota.callback.static.storage.soft";
-    private static final String STORAGE_QUOTA_HARD_PROP = "client.quota.callback.static.storage.hard";
-    private static final String STORAGE_CHECK_INTERVAL_PROP = "client.quota.callback.static.storage.check-interval";
-    private static final String LOG_DIRS_PROP = "log.dirs";
+    static final String PRODUCE_QUOTA_PROP = "client.quota.callback.static.produce";
+    static final String FETCH_QUOTA_PROP = "client.quota.callback.static.fetch";
+    static final String REQUEST_QUOTA_PROP = "client.quota.callback.static.request";
+    static final String STORAGE_QUOTA_SOFT_PROP = "client.quota.callback.static.storage.soft";
+    static final String STORAGE_QUOTA_HARD_PROP = "client.quota.callback.static.storage.hard";
+    static final String STORAGE_QUOTA_PERCENTAGES_PROP = "client.quota.callback.static.storage.percentages";
+    static final String STORAGE_CHECK_INTERVAL_PROP = "client.quota.callback.static.storage.check-interval";
+    static final String LOG_DIRS_PROP = "log.dirs";
 
     public StaticQuotaConfig(Map<String, ?> props, boolean doLog) {
         super(new ConfigDef()
@@ -35,6 +38,7 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(REQUEST_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Request processing time quota (in seconds)")
                         .define(STORAGE_QUOTA_SOFT_PROP, LONG, Long.MAX_VALUE, HIGH, "Hard limit for amount of storage allowed (in bytes)")
                         .define(STORAGE_QUOTA_HARD_PROP, LONG, Long.MAX_VALUE, HIGH, "Soft limit for amount of storage allowed (in bytes)")
+                        .define(STORAGE_QUOTA_PERCENTAGES_PROP, STRING, "/tmp/kafka-logs;80;100", new PercentagesValidator(), HIGH, "Percentages, soft and hard, allowed for volumes (FileStore) - in format path1;soft1;hard1|path2;soft2;hard2|...")
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (default of 0 means disabled")
                         .define(LOG_DIRS_PROP, STRING, "/tmp/kafka-logs", HIGH, "Broker log directory"),
                 props,
@@ -62,12 +66,31 @@ public class StaticQuotaConfig extends AbstractConfig {
         return getLong(STORAGE_QUOTA_SOFT_PROP);
     }
 
+    String getStoragePercents() {
+        return getString(STORAGE_QUOTA_PERCENTAGES_PROP);
+    }
+
     int getStorageCheckInterval() {
         return getInt(STORAGE_CHECK_INTERVAL_PROP);
     }
 
     String getLogDirs() {
         return getString(LOG_DIRS_PROP);
+    }
+
+    static class PercentagesValidator implements ConfigDef.Validator {
+        private static final Pattern PATTERN = Pattern.compile("([^;]+;\\d+\\.?(\\d+)?;\\d+\\.?(\\d+)?)(\\|[^;]+;\\d+\\.?(\\d+)?;\\d+\\.?(\\d+)?)*");
+
+        @Override
+        public void ensureValid(String name, Object value) {
+            if (!(value instanceof String)) {
+                throw new InvalidConfigurationException(STORAGE_QUOTA_PERCENTAGES_PROP + " should be a string");
+            }
+            String string = (String) value;
+            if (!PATTERN.matcher(string).matches()) {
+                throw new InvalidConfigurationException(STORAGE_QUOTA_PERCENTAGES_PROP + " has invalid format: " + string);
+            }
+        }
     }
 }
 
