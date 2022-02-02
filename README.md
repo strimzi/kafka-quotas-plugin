@@ -36,11 +36,12 @@ spec:
     config:
       # ...
       client.quota.callback.class: io.strimzi.kafka.quotas.StaticQuotaCallback
-      client.quota.callback.static.produce: 1000000           # 1 MB/s
-      client.quota.callback.static.fetch: 1000000             # 1 MB/s
-      client.quota.callback.static.storage.soft: 239538204672 # 80GB
-      client.quota.callback.static.storage.hard: 249538204672 # 100GB
-      client.quota.callback.static.storage.check-interval: 5  # Check storage every 5 seconds
+      client.quota.callback.static.produce: 1000000                                    # 1 MB/s
+      client.quota.callback.static.fetch: 1000000                                      # 1 MB/s
+      client.quota.callback.static.storage.soft: 239538204672                          # 80GB
+      client.quota.callback.static.storage.hard: 249538204672                          # 100GB
+      client.quota.callback.static.storage.check-interval: 5                           # Check storage every 5 seconds
+      client.quota.callback.static.excluded.principal.name.list: principal1,principal2 # Optional list of principals not to be subjected to the quota
   # ...
 ```
 
@@ -66,6 +67,9 @@ client.quota.callback.static.storage.hard=100000000000
 
 # Check storage usage every 5 seconds
 client.quota.callback.static.storage.check-interval=5
+
+# Optional list of principals not to be subjected to the quota
+client.quota.callback.static.excluded.principal.name.list=principal1,principal2
 ```
 
 ## Metrics
