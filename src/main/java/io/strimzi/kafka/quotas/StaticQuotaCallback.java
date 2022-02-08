@@ -67,15 +67,15 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             return Quota.upperBound(Double.MAX_VALUE).bound();
         }
 
-        // Don't allow producing messages if we're beyond the storage limit.
+        // Don't allow producing messages if we're beyond the storage limit, and limit consumers after the hard quota
         long currentStorageUsage = storageUsed.get();
         if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage > storageQuotaSoft && currentStorageUsage < storageQuotaHard) {
             double minThrottle = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
             double limit = minThrottle * (1.0 - (1.0 * (currentStorageUsage - storageQuotaSoft) / (storageQuotaHard - storageQuotaSoft)));
             maybeLog(lastLoggedMessageSoftTimeMs, "Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
             return limit;
-        } else if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage >= storageQuotaHard) {
-            maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
+        } else if ((ClientQuotaType.PRODUCE.equals(quotaType) || ClientQuotaType.FETCH.equals(quotaType)) && currentStorageUsage >= storageQuotaHard) {
+            maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer and consumer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
             return 1.0;
         }
         return quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
