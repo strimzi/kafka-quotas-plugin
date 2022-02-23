@@ -16,11 +16,12 @@ import java.util.Map;
 import static org.apache.kafka.common.config.ConfigDef.Importance.HIGH;
 import static org.apache.kafka.common.config.ConfigDef.Importance.MEDIUM;
 import static org.apache.kafka.common.config.ConfigDef.Type.DOUBLE;
-import static org.apache.kafka.common.config.ConfigDef.Type.INT;
 import static org.apache.kafka.common.config.ConfigDef.Type.LIST;
 import static org.apache.kafka.common.config.ConfigDef.Type.LONG;
-import static org.apache.kafka.common.config.ConfigDef.Type.STRING;
 
+/**
+ * Configuration for the static quota plugin.
+ */
 public class StaticQuotaConfig extends AbstractConfig {
     static final String PRODUCE_QUOTA_PROP = "client.quota.callback.static.produce";
     static final String FETCH_QUOTA_PROP = "client.quota.callback.static.fetch";
@@ -31,6 +32,11 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String STORAGE_CHECK_INTERVAL_PROP = "client.quota.callback.static.storage.check-interval";
     static final String LOG_DIRS_PROP = "log.dirs";
 
+    /**
+     * Construct a configuration for the static quota plugin.
+     * @param props the configuration properties
+     * @param doLog whether the configurations should be logged
+     */
     public StaticQuotaConfig(Map<String, ?> props, boolean doLog) {
         super(new ConfigDef()
                         .define(PRODUCE_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Produce bandwidth rate quota (in bytes)")
@@ -39,8 +45,8 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(EXCLUDED_PRINCIPAL_NAME_LIST_PROP, LIST, List.of(), MEDIUM, "List of principals that are excluded from the quota")
                         .define(STORAGE_QUOTA_SOFT_PROP, LONG, Long.MAX_VALUE, HIGH, "Hard limit for amount of storage allowed (in bytes)")
                         .define(STORAGE_QUOTA_HARD_PROP, LONG, Long.MAX_VALUE, HIGH, "Soft limit for amount of storage allowed (in bytes)")
-                        .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (default of 0 means disabled)")
-                        .define(LOG_DIRS_PROP, STRING, "/tmp/kafka-logs", HIGH, "Broker log directory"),
+                        .define(STORAGE_CHECK_INTERVAL_PROP, LONG, 0, MEDIUM, "Interval between storage check runs (default of 0 means disabled")
+                        .define(LOG_DIRS_PROP, LIST, List.of(), HIGH, "Broker log directories"),
                 props,
                 doLog);
     }
@@ -66,12 +72,12 @@ public class StaticQuotaConfig extends AbstractConfig {
         return getLong(STORAGE_QUOTA_SOFT_PROP);
     }
 
-    int getStorageCheckInterval() {
-        return getInt(STORAGE_CHECK_INTERVAL_PROP);
+    long getStorageCheckInterval() {
+        return getLong(STORAGE_CHECK_INTERVAL_PROP);
     }
 
-    String getLogDirs() {
-        return getString(LOG_DIRS_PROP);
+    List<String> getLogDirs() {
+        return getList(LOG_DIRS_PROP);
     }
 
     List<String> getExcludedPrincipalNameList() {
