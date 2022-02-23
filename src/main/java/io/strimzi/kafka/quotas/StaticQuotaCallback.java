@@ -26,6 +26,8 @@ import org.apache.kafka.server.quota.ClientQuotaType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.util.Locale.ROOT;
+
 /**
  * Allows configuring generic quotas for a broker independent of users and clients.
  */
@@ -132,6 +134,8 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
+        } finally {
+            Metrics.defaultRegistry().allMetrics().keySet().stream().filter(m -> scope.equals(m.getScope())).forEach(Metrics.defaultRegistry()::removeMetric);
         }
     }
 
@@ -154,7 +158,26 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             log.info("Excluded principals {}", excludedPrincipalNameList);
         }
 
-        createCustomMetrics();
+        Metrics.newGauge(metricName(StorageChecker.class, "TotalStorageUsedBytes"), new Gauge<Long>() {
+            public Long value() {
+                return storageUsed.get();
+            }
+        });
+        Metrics.newGauge(metricName(StorageChecker.class, "SoftLimitBytes"), new Gauge<Long>() {
+            public Long value() {
+                return storageQuotaSoft;
+            }
+        });
+        Metrics.newGauge(metricName(StorageChecker.class, "HardLimitBytes"), new Gauge<Long>() {
+            public Long value() {
+                return storageQuotaHard;
+            }
+        });
+
+        quotaMap.forEach((clientQuotaType, quota) -> {
+            String name = clientQuotaType.name().toUpperCase(ROOT).charAt(0) + clientQuotaType.name().toLowerCase(ROOT).substring(1);
+            Metrics.newGauge(metricName(StaticQuotaCallback.class, name), new ClientQuotaGauge(quota));
+        });
     }
 
     private void updateUsedStorage(Long newValue) {
@@ -164,22 +187,23 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
     }
 
-    private MetricName metricName(String name) {
-        String mBeanName = "io.strimzi.kafka.quotas:type=StorageChecker,name=" + name + "";
-        return new MetricName("io.strimzi.kafka.quotas", "StorageChecker", name, this.scope, mBeanName);
+    private MetricName metricName(Class<?> clazz, String name) {
+        String group = clazz.getPackageName();
+        String type = clazz.getSimpleName();
+        String mBeanName = String.format("%s:type=%s,name=%s", group, type, name);
+        MetricName storageChecker = new MetricName(group, type, name, this.scope, mBeanName);
+        return storageChecker;
     }
 
-    private void createCustomMetrics() {
+    private static class ClientQuotaGauge extends Gauge<Double> {
+        private final Quota quota;
 
-        Metrics.newGauge(metricName("TotalStorageUsedBytes"), new Gauge<Long>() {
-            public Long value() {
-                return storageUsed.get();
-            }
-        });
-        Metrics.newGauge(metricName("SoftLimitBytes"), new Gauge<Long>() {
-            public Long value() {
-                return storageQuotaSoft;
-            }
-        });
+        public ClientQuotaGauge(Quota quota) {
+            this.quota = quota;
+        }
+
+        public Double value() {
+            return quota.bound();
+        }
     }
 }
