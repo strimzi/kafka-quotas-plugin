@@ -16,6 +16,7 @@ import java.util.Map;
 import static org.apache.kafka.common.config.ConfigDef.Importance.HIGH;
 import static org.apache.kafka.common.config.ConfigDef.Importance.MEDIUM;
 import static org.apache.kafka.common.config.ConfigDef.Type.DOUBLE;
+import static org.apache.kafka.common.config.ConfigDef.Type.INT;
 import static org.apache.kafka.common.config.ConfigDef.Type.LIST;
 import static org.apache.kafka.common.config.ConfigDef.Type.LONG;
 
@@ -45,7 +46,7 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(EXCLUDED_PRINCIPAL_NAME_LIST_PROP, LIST, List.of(), MEDIUM, "List of principals that are excluded from the quota")
                         .define(STORAGE_QUOTA_SOFT_PROP, LONG, Long.MAX_VALUE, HIGH, "Hard limit for amount of storage allowed (in bytes)")
                         .define(STORAGE_QUOTA_HARD_PROP, LONG, Long.MAX_VALUE, HIGH, "Soft limit for amount of storage allowed (in bytes)")
-                        .define(STORAGE_CHECK_INTERVAL_PROP, LONG, 0, MEDIUM, "Interval between storage check runs (default of 0 means disabled")
+                        .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
                         .define(LOG_DIRS_PROP, LIST, List.of(), HIGH, "Broker log directories"),
                 props,
                 doLog);
@@ -72,8 +73,8 @@ public class StaticQuotaConfig extends AbstractConfig {
         return getLong(STORAGE_QUOTA_SOFT_PROP);
     }
 
-    long getStorageCheckInterval() {
-        return getLong(STORAGE_CHECK_INTERVAL_PROP);
+    int getStorageCheckInterval() {
+        return getInt(STORAGE_CHECK_INTERVAL_PROP);
     }
 
     List<String> getLogDirs() {

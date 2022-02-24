@@ -9,6 +9,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -36,7 +37,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final AtomicLong storageUsed = new AtomicLong(0);
     private volatile long storageQuotaSoft = Long.MAX_VALUE;
     private volatile long storageQuotaHard = Long.MAX_VALUE;
-    private volatile int storageCheckInterval = Integer.MAX_VALUE;
     private volatile List<String> excludedPrincipalNameList = List.of();
     private final AtomicBoolean resetQuota = new AtomicBoolean(false);
     private final StorageChecker storageChecker = new StorageChecker();
@@ -135,12 +135,13 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         storageQuotaHard = config.getHardStorageQuota();
         excludedPrincipalNameList = config.getExcludedPrincipalNameList();
 
+        long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
         List<Path> logDirs = config.getLogDirs().stream().map(Paths::get).collect(Collectors.toList());
-        storageChecker.configure(config.getStorageCheckInterval(),
+        storageChecker.configure(storageCheckIntervalMillis,
                 logDirs,
                 this::updateUsedStorage);
 
-        log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckInterval);
+        log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
         if (!excludedPrincipalNameList.isEmpty()) {
             log.info("Excluded principals {}", excludedPrincipalNameList);
         }

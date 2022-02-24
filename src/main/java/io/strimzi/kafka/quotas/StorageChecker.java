@@ -12,7 +12,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -27,18 +26,18 @@ public class StorageChecker implements Runnable {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicLong storageUsed = new AtomicLong(0);
 
-    private volatile long storageCheckInterval;
+    private volatile long storageCheckIntervalMillis;
     private volatile List<Path> logDirs;
     private volatile Consumer<Long> consumer;
 
-    void configure(long storageCheckInterval, List<Path> logDirs, Consumer<Long> consumer) {
-        this.storageCheckInterval = storageCheckInterval;
+    void configure(long storageCheckIntervalMillis, List<Path> logDirs, Consumer<Long> consumer) {
+        this.storageCheckIntervalMillis = storageCheckIntervalMillis;
         this.logDirs = logDirs;
         this.consumer = consumer;
     }
 
     void startIfNecessary() {
-        if (running.compareAndSet(false, true) && storageCheckInterval > 0) {
+        if (running.compareAndSet(false, true) && storageCheckIntervalMillis > 0) {
             storageCheckerThread.setDaemon(true);
             storageCheckerThread.start();
         }
@@ -64,7 +63,7 @@ public class StorageChecker implements Runnable {
                             consumer.accept(diskUsage);
                         }
                         log.debug("Storage usage checked: {}", storageUsed.get());
-                        Thread.sleep(TimeUnit.SECONDS.toMillis(storageCheckInterval));
+                        Thread.sleep(storageCheckIntervalMillis);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
