@@ -4,12 +4,8 @@
  */
 package io.strimzi.kafka.quotas;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +17,6 @@ import java.util.stream.Collectors;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricName;
-
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
@@ -40,16 +35,15 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     private volatile Map<ClientQuotaType, Quota> quotaMap = new HashMap<>();
     private final AtomicLong storageUsed = new AtomicLong(0);
-    private volatile List<Path> logDirs;
     private volatile long storageQuotaSoft = Long.MAX_VALUE;
     private volatile long storageQuotaHard = Long.MAX_VALUE;
-    private volatile int storageCheckInterval = Integer.MAX_VALUE;
     private volatile List<String> excludedPrincipalNameList = List.of();
     private final AtomicBoolean resetQuota = new AtomicBoolean(false);
-    final StorageChecker storageChecker = new StorageChecker();
+    private final StorageChecker storageChecker = new StorageChecker();
     private final static long LOGGING_DELAY_MS = 1000;
     private AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
     private AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
+    private final String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
     @Override
     public Map<String, String> quotaMetricTags(ClientQuotaType quotaType, KafkaPrincipal principal, String clientId) {
@@ -139,105 +133,45 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         quotaMap = config.getQuotaMap();
         storageQuotaSoft = config.getSoftStorageQuota();
         storageQuotaHard = config.getHardStorageQuota();
-        storageCheckInterval = config.getStorageCheckInterval();
         excludedPrincipalNameList = config.getExcludedPrincipalNameList();
-        logDirs = Arrays.stream(config.getLogDirs().split(",")).map(Paths::get).collect(Collectors.toList());
 
-        log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckInterval);
+        long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
+        List<Path> logDirs = config.getLogDirs().stream().map(Paths::get).collect(Collectors.toList());
+        storageChecker.configure(storageCheckIntervalMillis,
+                logDirs,
+                this::updateUsedStorage);
+
+        log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
         if (!excludedPrincipalNameList.isEmpty()) {
             log.info("Excluded principals {}", excludedPrincipalNameList);
         }
+
+        createCustomMetrics();
     }
 
-    class StorageChecker implements Runnable {
-        private final Thread storageCheckerThread = new Thread(this, "storage-quota-checker");
-        private AtomicBoolean running = new AtomicBoolean(false);
-        private String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
-
-        private void createCustomMetrics() {
-
-            Metrics.newGauge(metricName("TotalStorageUsedBytes"), new Gauge<Long>() {
-                public Long value() {
-                    return storageUsed.get();
-                }
-            });
-            Metrics.newGauge(metricName("SoftLimitBytes"), new Gauge<Long>() {
-                public Long value() {
-                    return storageQuotaSoft;
-                }
-            });
+    private void updateUsedStorage(Long newValue) {
+        var oldValue = storageUsed.getAndSet(newValue);
+        if (oldValue != newValue) {
+            resetQuota.set(true);
         }
+    }
 
-        private MetricName metricName(String name) {
+    private MetricName metricName(String name) {
+        String mBeanName = "io.strimzi.kafka.quotas:type=StorageChecker,name=" + name + "";
+        return new MetricName("io.strimzi.kafka.quotas", "StorageChecker", name, this.scope, mBeanName);
+    }
 
-            String mBeanName = "io.strimzi.kafka.quotas:type=StorageChecker,name=" + name + "";
-            return new MetricName("io.strimzi.kafka.quotas", "StorageChecker", name, this.scope, mBeanName);
-        }
+    private void createCustomMetrics() {
 
-        void startIfNecessary() {
-            if (running.compareAndSet(false, true)) {
-                createCustomMetrics();
-                storageCheckerThread.setDaemon(true);
-                storageCheckerThread.start();
+        Metrics.newGauge(metricName("TotalStorageUsedBytes"), new Gauge<Long>() {
+            public Long value() {
+                return storageUsed.get();
             }
-        }
-
-        void stop() throws InterruptedException {
-            running.set(false);
-            storageCheckerThread.interrupt();
-            storageCheckerThread.join();
-        }
-
-        @Override
-        public void run() {
-            if (StaticQuotaCallback.this.logDirs != null
-                    && StaticQuotaCallback.this.storageQuotaSoft > 0
-                    && StaticQuotaCallback.this.storageQuotaHard > 0
-                    && StaticQuotaCallback.this.storageCheckInterval > 0) {
-                try {
-                    log.info("Quota Storage Checker is now starting");
-                    while (running.get()) {
-                        try {
-                            long diskUsage = checkDiskUsage();
-                            long previousUsage = StaticQuotaCallback.this.storageUsed.getAndSet(diskUsage);
-                            if (diskUsage != previousUsage) {
-                                StaticQuotaCallback.this.resetQuota.set(true);
-                            }
-                            log.debug("Storage usage checked: {}", StaticQuotaCallback.this.storageUsed.get());
-                            Thread.sleep(TimeUnit.SECONDS.toMillis(StaticQuotaCallback.this.storageCheckInterval));
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            break;
-                        } catch (Exception e) {
-                            log.warn("Exception in storage checker thread", e);
-                        }
-                    }
-                } finally {
-                    log.info("Quota Storage Checker is now finishing");
-                }
+        });
+        Metrics.newGauge(metricName("SoftLimitBytes"), new Gauge<Long>() {
+            public Long value() {
+                return storageQuotaSoft;
             }
-        }
-
-        long checkDiskUsage() {
-            return logDirs.stream()
-                .filter(Files::exists)
-                .map(path -> apply(() -> Files.getFileStore(path)))
-                .distinct()
-                .mapToLong(store -> apply(() -> store.getTotalSpace() - store.getUsableSpace()))
-                .sum();
-        }
-    }
-
-    static <T> T apply(IOSupplier<T> supplier) {
-        try {
-            return supplier.get();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    @FunctionalInterface
-    interface IOSupplier<T> {
-        T get() throws IOException;
+        });
     }
 }
