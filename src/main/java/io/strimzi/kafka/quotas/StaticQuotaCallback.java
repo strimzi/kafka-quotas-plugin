@@ -26,7 +26,7 @@ import org.apache.kafka.server.quota.ClientQuotaType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.util.Locale.ROOT;
+import static java.util.Locale.ENGLISH;
 
 /**
  * Allows configuring generic quotas for a broker independent of users and clients.
@@ -175,7 +175,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         });
 
         quotaMap.forEach((clientQuotaType, quota) -> {
-            String name = clientQuotaType.name().toUpperCase(ROOT).charAt(0) + clientQuotaType.name().toLowerCase(ROOT).substring(1);
+            String name = clientQuotaType.name().toUpperCase(ENGLISH).charAt(0) + clientQuotaType.name().toLowerCase(ENGLISH).substring(1);
             Metrics.newGauge(metricName(StaticQuotaCallback.class, name), new ClientQuotaGauge(quota));
         });
     }
