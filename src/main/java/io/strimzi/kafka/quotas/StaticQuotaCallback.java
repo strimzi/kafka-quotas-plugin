@@ -191,8 +191,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         String group = clazz.getPackageName();
         String type = clazz.getSimpleName();
         String mBeanName = String.format("%s:type=%s,name=%s", group, type, name);
-        MetricName storageChecker = new MetricName(group, type, name, this.scope, mBeanName);
-        return storageChecker;
+        return new MetricName(group, type, name, this.scope, mBeanName);
     }
 
     private static class ClientQuotaGauge extends Gauge<Double> {
