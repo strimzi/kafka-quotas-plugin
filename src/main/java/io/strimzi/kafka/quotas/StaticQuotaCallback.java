@@ -38,12 +38,20 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private volatile long storageQuotaSoft = Long.MAX_VALUE;
     private volatile long storageQuotaHard = Long.MAX_VALUE;
     private volatile List<String> excludedPrincipalNameList = List.of();
-    private final AtomicBoolean resetQuota = new AtomicBoolean(false);
-    private final StorageChecker storageChecker = new StorageChecker();
+    private final AtomicBoolean resetQuota = new AtomicBoolean(true);
+    private final StorageChecker storageChecker;
     private final static long LOGGING_DELAY_MS = 1000;
     private AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
     private AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
     private final String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
+
+    public StaticQuotaCallback() {
+        this(new StorageChecker());
+    }
+
+    StaticQuotaCallback(StorageChecker storageChecker) {
+        this.storageChecker = storageChecker;
+    }
 
     @Override
     public Map<String, String> quotaMetricTags(ClientQuotaType quotaType, KafkaPrincipal principal, String clientId) {
@@ -108,7 +116,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     @Override
     public boolean quotaResetRequired(ClientQuotaType quotaType) {
-        return resetQuota.getAndSet(true);
+        return resetQuota.getAndSet(false);
     }
 
     @Override

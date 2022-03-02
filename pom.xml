@@ -96,6 +96,7 @@
         <slf4j.version>1.7.30</slf4j.version>
         <yammer-metrics.version>2.2.0</yammer-metrics.version>
         <junit.version>5.7.2</junit.version>
+        <mockito.version>2.28.2</mockito.version>
 
         <!-- property to skip surefire tests during failsafe execution -->
         <skip.surefire.tests>${skipTests}</skip.surefire.tests>
@@ -136,6 +137,13 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
