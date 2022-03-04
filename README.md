@@ -74,9 +74,13 @@ client.quota.callback.static.excluded.principal.name.list=principal1,principal2
 
 ## Metrics
 
-The plugin currently provides 2 metrics:
+The plugin currently provides the following metrics:
 * `io.strimzi.kafka.quotas:type=StorageChecker,name=TotalStorageUsedBytes` shows the current storage usage
 * `io.strimzi.kafka.quotas:type=StorageChecker,name=SoftLimitBytes` shows the currently configured soft limit
+* `io.strimzi.kafka.quotas:type=StorageChecker,name=HardLimitBytes` shows the currently configured hard limit
+* `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Produce` shows the currently configured produce quota
+* `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Fetch` shows the currently configured fetch quota
+* `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Request` shows the currently configured request quota
 
 ## Building
 
