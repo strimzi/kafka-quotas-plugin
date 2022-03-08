@@ -43,8 +43,8 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final AtomicBoolean resetQuota = new AtomicBoolean(true);
     private final StorageChecker storageChecker;
     private final static long LOGGING_DELAY_MS = 1000;
-    private AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
-    private AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
+    private final AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
+    private final AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
     private final String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
     public StaticQuotaCallback() {
