@@ -4,17 +4,20 @@
  */
 package io.strimzi.kafka.quotas;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.AbstractMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Periodically reports the total storage used by one or more filesystems.
@@ -57,10 +60,10 @@ public class StorageChecker implements Runnable {
                 log.info("Quota Storage Checker is now starting");
                 while (running.get()) {
                     try {
-                        long diskUsage = checkDiskUsage();
-                        long previousUsage = storageUsed.getAndSet(diskUsage);
-                        if (diskUsage != previousUsage) {
-                            consumer.accept(diskUsage);
+                        long totalDiskUsage = totalDiskUSage();
+                        long previousUsage = storageUsed.getAndSet(totalDiskUsage);
+                        if (totalDiskUsage != previousUsage) {
+                            consumer.accept(totalDiskUsage);
                         }
                         log.debug("Storage usage checked: {}", storageUsed.get());
                         Thread.sleep(storageCheckIntervalMillis);
@@ -77,13 +80,25 @@ public class StorageChecker implements Runnable {
         }
     }
 
+    @Deprecated(forRemoval = true, since = "0.3.0")
     long checkDiskUsage() {
+        return totalDiskUSage();
+    }
+
+    long totalDiskUSage() {
+        return gatherDiskUsage().values().stream().mapToLong(Long::longValue).sum();
+    }
+
+    Map<String, Long> gatherDiskUsage() {
         return logDirs.stream()
                 .filter(Files::exists)
                 .map(path -> apply(() -> Files.getFileStore(path)))
                 .distinct()
-                .mapToLong(store -> apply(() -> store.getTotalSpace() - store.getUsableSpace()))
-                .sum();
+                .map(store -> {
+                    final Long usedSpace = apply(() -> store.getTotalSpace() - store.getUsableSpace());
+                    return new AbstractMap.SimpleImmutableEntry<>(store.name(), usedSpace != null ? usedSpace : 0);
+                })
+                .collect(Collectors.toMap(AbstractMap.SimpleImmutableEntry::getKey, AbstractMap.SimpleImmutableEntry::getValue));
     }
 
     static <T> T apply(IOSupplier<T> supplier) {
