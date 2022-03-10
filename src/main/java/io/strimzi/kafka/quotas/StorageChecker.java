@@ -31,12 +31,14 @@ public class StorageChecker implements Runnable {
 
     private volatile long storageCheckIntervalMillis;
     private volatile List<Path> logDirs;
-    private volatile Consumer<Long> consumer;
+    private volatile Consumer<Long> totalUsageConsumer;
+    private volatile Consumer<Map<String, Long>> perDiskUsageConsumer;
 
-    void configure(long storageCheckIntervalMillis, List<Path> logDirs, Consumer<Long> consumer) {
+    void configure(long storageCheckIntervalMillis, List<Path> logDirs, Consumer<Long> totalUsageConsumer, Consumer<Map<String, Long>> perDiskUsageConsumer) {
         this.storageCheckIntervalMillis = storageCheckIntervalMillis;
         this.logDirs = logDirs;
-        this.consumer = consumer;
+        this.totalUsageConsumer = totalUsageConsumer;
+        this.perDiskUsageConsumer = perDiskUsageConsumer;
     }
 
     void startIfNecessary() {
@@ -60,10 +62,12 @@ public class StorageChecker implements Runnable {
                 log.info("Quota Storage Checker is now starting");
                 while (running.get()) {
                     try {
-                        long totalDiskUsage = totalDiskUSage();
+                        final Map<String, Long> usagePerDisk = gatherDiskUsage();
+                        long totalDiskUsage = totalDiskUSage(usagePerDisk);
                         long previousUsage = storageUsed.getAndSet(totalDiskUsage);
                         if (totalDiskUsage != previousUsage) {
-                            consumer.accept(totalDiskUsage);
+                            totalUsageConsumer.accept(totalDiskUsage);
+                            perDiskUsageConsumer.accept(usagePerDisk);
                         }
                         log.debug("Storage usage checked: {}", storageUsed.get());
                         Thread.sleep(storageCheckIntervalMillis);
@@ -82,11 +86,11 @@ public class StorageChecker implements Runnable {
 
     @Deprecated(forRemoval = true, since = "0.3.0")
     long checkDiskUsage() {
-        return totalDiskUSage();
+        return totalDiskUSage(gatherDiskUsage());
     }
 
-    long totalDiskUSage() {
-        return gatherDiskUsage().values().stream().mapToLong(Long::longValue).sum();
+    long totalDiskUSage(Map<String, Long> diskUsage) {
+        return diskUsage.values().stream().mapToLong(Long::longValue).sum();
     }
 
     Map<String, Long> gatherDiskUsage() {

@@ -4,16 +4,6 @@
  */
 package io.strimzi.kafka.quotas;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
@@ -30,8 +20,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
 class StaticQuotaCallbackTest {
 
+    public static final double EPSILON = 1E-5;
     StaticQuotaCallback target;
 
     @BeforeEach
@@ -93,7 +94,7 @@ class StaticQuotaCallbackTest {
     void quotaResetRequired() {
         StorageChecker mock = mock(StorageChecker.class);
         ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
-        doNothing().when(mock).configure(anyLong(), anyList(), argument.capture());
+        doNothing().when(mock).configure(anyLong(), anyList(), argument.capture(), any());
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock);
         quotaCallback.configure(Map.of());
         Consumer<Long> storageUpdateConsumer = argument.getValue();
@@ -112,10 +113,51 @@ class StaticQuotaCallbackTest {
     }
 
     @Test
+    void quotaResetRequiredForDiskUsage() {
+        //Given
+        StorageChecker mock = mock(StorageChecker.class);
+        ArgumentCaptor<Consumer<Map<String, Long>>> argument = ArgumentCaptor.forClass(Consumer.class);
+        doNothing().when(mock).configure(anyLong(), anyList(), any(), argument.capture());
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock);
+        quotaCallback.configure(Map.of());
+        Consumer<Map<String, Long>> storageUpdateConsumer = argument.getValue();
+        quotaCallback.updateClusterMetadata(null);
+        quotaCallback.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+        final Map<String, Long> underQuotaUsage = Map.of("Disk one", 8L);
+        final Map<String, Long> overQuotaUsage = Map.of("Disk one", 12L);
+
+        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
+        assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
+
+        //When
+        storageUpdateConsumer.accept(overQuotaUsage); //Need to use over quota here otherwise the factor doesn't change
+
+        //Then
+        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
+
+        //When
+        storageUpdateConsumer.accept(overQuotaUsage);
+
+        //Then
+        assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
+
+        //When
+        storageUpdateConsumer.accept(underQuotaUsage);
+
+        //Then
+        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 2nd storage state change");
+
+        quotaCallback.close();
+    }
+
+    @Test
     void storageCheckerMetrics() {
         StorageChecker mock = mock(StorageChecker.class);
         ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
-        doNothing().when(mock).configure(anyLong(), anyList(), argument.capture());
+        doNothing().when(mock).configure(anyLong(), anyList(), argument.capture(), any());
 
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock);
 
@@ -159,6 +201,229 @@ class StaticQuotaCallbackTest {
         MetricName name = group.firstKey();
         String expectedMbeanName = String.format("io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=%s", name.getName());
         assertEquals(expectedMbeanName, name.getMBeanName(), "unexpected mbean name");
+    }
+
+    @Test
+    void shouldSetQuotaFactorToZeroIfHardLimitBreached() {
+        //Given
+        final Map<String, Long> diskUsage = Map.of("Disk one", 20L);
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+
+        //When
+        target.calculateQuotaFactor(diskUsage);
+
+        //Then
+        assertEquals(0.0D, target.currentQuotaFactor, EPSILON);
+    }
+
+    @Test
+    void shouldSetQuotaFactorToZeroIfUsageIsEqualToHardLimit() {
+        //Given
+        final Map<String, Long> diskUsage = Map.of("Disk one", 15L);
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+
+        //When
+        target.calculateQuotaFactor(diskUsage);
+
+        //Then
+        assertEquals(0.0D, target.currentQuotaFactor, EPSILON);
+    }
+
+    @Test
+    void shouldReduceQuotaFactorIfUsageBetweenSoftAndHardLimits() {
+        //Given
+        final Map<String, Long> usagePerDisk = Map.of("Disk one", 12L);
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+
+        //When
+        target.calculateQuotaFactor(usagePerDisk);
+
+        //Then
+        assertEquals(0.6D, target.currentQuotaFactor, EPSILON);
+    }
+
+    @Test
+    void shouldSetQuotaFactorToZeroIfHardLimitBreachedForAnyDisk() {
+        //Given
+        final Map<String, Long> diskUsage = Map.of("Disk one", 8L, "Disk Two", 20L);
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+
+        //When
+        target.calculateQuotaFactor(diskUsage);
+
+        //Then
+        assertEquals(0.0D, target.currentQuotaFactor, EPSILON);
+    }
+
+    @Test
+    void shouldReduceQuotaFactorIfUsageBetweenSoftAndHardLimitsForOneDisk() {
+        //Given
+        final Map<String, Long> usagePerDisk = Map.of("Disk one", 8L, "Disk Two", 12L);
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+
+        //When
+        target.calculateQuotaFactor(usagePerDisk);
+
+        //Then
+        assertEquals(0.6D, target.currentQuotaFactor, EPSILON);
+    }
+
+    @Test
+    void shouldUseTheSmallestFactorWhenMultipleDisksAreOverTheSoftLimit() {
+        //Given
+        final Map<String, Long> usagePerDisk = Map.of("Disk one", 14L, "Disk Two", 12L);
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+
+        //When
+        target.calculateQuotaFactor(usagePerDisk);
+
+        //Then
+        assertEquals(0.2D, target.currentQuotaFactor, EPSILON);
+        //Disk one gets a factor of 0.2
+        //Disk two gets a factor of 0.6
+    }
+
+    @Test
+    void shouldApplyHardLimitInPreferenceToSoftLimit() {
+        //Given
+        final Map<String, Long> diskUsage = Map.of("Disk one", 12L, "Disk Two", 20L);
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+
+        //When
+        target.calculateQuotaFactor(diskUsage);
+
+        //Then
+        assertEquals(0.0D, target.currentQuotaFactor, EPSILON);
+    }
+
+    @Test
+    void shouldSetQuotaFactorToOneIfUsageBelowSoftAndHardLimits() {
+        //Given
+        final Map<String, Long> diskUsage = Map.of("Disk one", 8L);
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+
+        //When
+        target.calculateQuotaFactor(diskUsage);
+
+        //Then
+        assertEquals(1.0D, target.currentQuotaFactor, EPSILON);
+    }
+
+    @Test
+    void shouldMarkQuotaResetWhenQuotaFactorChanges() {
+        //Given
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+        final Map<String, Long> underQuotaUsage = Map.of("Disk one", 8L);
+        final Map<String, Long> overQuotaUsage = Map.of("Disk one", 12L);
+        target.calculateQuotaFactor(underQuotaUsage);
+        assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE)); //quotaResetRequired resets the flag to false
+        assertFalse(target.quotaResetRequired(ClientQuotaType.PRODUCE));
+
+        //When
+        target.calculateQuotaFactor(overQuotaUsage);
+
+        //Then
+        assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE));
+    }
+
+    @Test
+    void shouldMarkQuotaResetWhenQuotaFactorChangesFromHardToSoft() {
+        //Given
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+        final Map<String, Long> underQuotaUsage = Map.of("Disk one", 16L);
+        final Map<String, Long> overQuotaUsage = Map.of("Disk one", 12L);
+        target.calculateQuotaFactor(underQuotaUsage);
+        assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE)); //quotaResetRequired resets the flag to false
+        assertFalse(target.quotaResetRequired(ClientQuotaType.PRODUCE));
+
+        //When
+        target.calculateQuotaFactor(overQuotaUsage);
+
+        //Then
+        assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE));
+    }
+
+    @Test
+    void shouldNotMarkQuotaResetWhenQuotaFactorUnchanged() {
+        //Given
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+        final Map<String, Long> underQuotaUsage = Map.of("Disk one", 8L);
+        target.calculateQuotaFactor(underQuotaUsage);
+        assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE));
+
+        //When
+        target.calculateQuotaFactor(underQuotaUsage);
+
+        //Then
+        assertFalse(target.quotaResetRequired(ClientQuotaType.PRODUCE));
+    }
+
+    @Test
+    void shouldReduceProduceQuotaByQuotaFactor() {
+        KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
+        target.configure(Map.of(
+                StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+
+        final Map<String, Long> overSoftQuota = Map.of("Disk one", 12L);
+        target.calculateQuotaFactor(overSoftQuota);
+        assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE));
+
+        double quotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
+        //1024 * 0.6 = 614.4
+        assertEquals(614.4, quotaLimit, EPSILON);
+    }
+
+    @Test
+    void shouldBlockProduceWhenHardLimitBreached() {
+        KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
+        target.configure(Map.of(
+                StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
+        ));
+
+        final Map<String, Long> pverHardQuota = Map.of("Disk one", 16L);
+        target.calculateQuotaFactor(pverHardQuota);
+        assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE));
+
+        double quotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
+        assertEquals(1.0, quotaLimit, EPSILON);
     }
 
     private SortedMap<MetricName, Metric> getMetricGroup(String p, String t) {

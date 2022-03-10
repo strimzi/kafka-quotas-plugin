@@ -34,6 +34,7 @@ import static java.util.Locale.ENGLISH;
 public class StaticQuotaCallback implements ClientQuotaCallback {
     private static final Logger log = LoggerFactory.getLogger(StaticQuotaCallback.class);
     private static final String EXCLUDED_PRINCIPAL_QUOTA_KEY = "excluded-principal-quota-key";
+    private static final double EPSILON = 1E-5;
 
     private volatile Map<ClientQuotaType, Quota> quotaMap = new HashMap<>();
     private final AtomicLong storageUsed = new AtomicLong(0);
@@ -46,6 +47,8 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
     private final AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
     private final String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
+    //@VisibleForTesting
+    volatile Double currentQuotaFactor = 1.0;
 
     public StaticQuotaCallback() {
         this(new StorageChecker());
@@ -72,15 +75,12 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
 
         // Don't allow producing messages if we're beyond the storage limit.
-        long currentStorageUsage = storageUsed.get();
-        if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage > storageQuotaSoft && currentStorageUsage < storageQuotaHard) {
-            double minThrottle = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
-            double limit = minThrottle * (1.0 - (1.0 * (currentStorageUsage - storageQuotaSoft) / (storageQuotaHard - storageQuotaSoft)));
-            maybeLog(lastLoggedMessageSoftTimeMs, "Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
+        if (ClientQuotaType.PRODUCE.equals(quotaType)) {
+            double minThrottle = quotaMap.getOrDefault(quotaType, Quota.upperBound(currentQuotaFactor)).bound();
+            final double produceQuota = minThrottle * currentQuotaFactor;
+            final double limit = Math.max(produceQuota, 1.0D);
+            maybeLog(lastLoggedMessageSoftTimeMs, "Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed.get(), limit);
             return limit;
-        } else if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage >= storageQuotaHard) {
-            maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
-            return 1.0;
         }
         return quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
     }
@@ -151,7 +151,8 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         List<Path> logDirs = config.getLogDirs().stream().map(Paths::get).collect(Collectors.toList());
         storageChecker.configure(storageCheckIntervalMillis,
                 logDirs,
-                this::updateUsedStorage);
+                this::updateUsedStorage,
+                this::calculateQuotaFactor);
 
         log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
         if (!excludedPrincipalNameList.isEmpty()) {
@@ -180,11 +181,42 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         });
     }
 
+    //@VisiableForTesting
+    void calculateQuotaFactor(Map<String, Long> usagePerDisk) {
+        Double newFactor = 1.0D;
+        for (Map.Entry<String, Long> diskUsage : usagePerDisk.entrySet()) {
+            if (breachesHardLimit(diskUsage.getValue())) {
+                newFactor = 0.0D;
+                maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
+                //If any disk is over the hard limit that hard limit is applied.
+                break;
+            } else if (breachesSoftLimitOnly(diskUsage.getValue())) {
+                final long overQuotaUsage = diskUsage.getValue() - storageQuotaSoft;
+                final long quotaCapacity = storageQuotaHard - storageQuotaSoft;
+                //Apply the most aggressive factor across all the disks
+                newFactor = Math.min(newFactor, 1.0 - (1.0 * overQuotaUsage / quotaCapacity));
+            }
+        }
+        storageUsed.set(storageChecker.totalDiskUSage(usagePerDisk));
+        if (Math.abs(currentQuotaFactor - newFactor) > EPSILON) {
+            currentQuotaFactor = newFactor;
+            resetQuota.set(true);
+        }
+    }
+
     private void updateUsedStorage(Long newValue) {
         var oldValue = storageUsed.getAndSet(newValue);
         if (oldValue != newValue) {
             resetQuota.set(true);
         }
+    }
+
+    private boolean breachesHardLimit(long currentStorageUsage) {
+        return currentStorageUsage >= storageQuotaHard;
+    }
+
+    private boolean breachesSoftLimitOnly(long currentStorageUsage) {
+        return currentStorageUsage > storageQuotaSoft && currentStorageUsage < storageQuotaHard;
     }
 
     private MetricName metricName(Class<?> clazz, String name) {
