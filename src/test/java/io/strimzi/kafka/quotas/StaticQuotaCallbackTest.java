@@ -92,32 +92,10 @@ class StaticQuotaCallbackTest {
 
     @Test
     void quotaResetRequired() {
-        StorageChecker mock = mock(StorageChecker.class);
-        ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
-        doNothing().when(mock).configure(anyLong(), anyList(), argument.capture(), any());
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock);
-        quotaCallback.configure(Map.of());
-        Consumer<Long> storageUpdateConsumer = argument.getValue();
-        quotaCallback.updateClusterMetadata(null);
-
-        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
-        assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        storageUpdateConsumer.accept(1L);
-        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
-        storageUpdateConsumer.accept(1L);
-        assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        storageUpdateConsumer.accept(2L);
-        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 2nd storage state change");
-
-        quotaCallback.close();
-    }
-
-    @Test
-    void quotaResetRequiredForDiskUsage() {
         //Given
         StorageChecker mock = mock(StorageChecker.class);
         ArgumentCaptor<Consumer<Map<String, Long>>> argument = ArgumentCaptor.forClass(Consumer.class);
-        doNothing().when(mock).configure(anyLong(), anyList(), any(), argument.capture());
+        doNothing().when(mock).configure(anyLong(), anyList(), argument.capture());
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock);
         quotaCallback.configure(Map.of());
         Consumer<Map<String, Long>> storageUpdateConsumer = argument.getValue();
@@ -155,18 +133,12 @@ class StaticQuotaCallbackTest {
 
     @Test
     void storageCheckerMetrics() {
-        StorageChecker mock = mock(StorageChecker.class);
-        ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
-        doNothing().when(mock).configure(anyLong(), anyList(), argument.capture(), any());
-
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock);
-
-        quotaCallback.configure(Map.of(
+        target.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 15L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 16L
         ));
 
-        argument.getValue().accept(17L);
+        target.calculateQuotaFactor(Map.of("Disk one", 17L));
 
         SortedMap<MetricName, Metric> group = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "StorageChecker");
 
@@ -178,8 +150,6 @@ class StaticQuotaCallbackTest {
         MetricName name = group.firstKey();
         String expectedMbeanName = String.format("io.strimzi.kafka.quotas:type=StorageChecker,name=%s", name.getName());
         assertEquals(expectedMbeanName, name.getMBeanName(), "unexpected mbean name");
-
-        quotaCallback.close();
     }
 
     @Test

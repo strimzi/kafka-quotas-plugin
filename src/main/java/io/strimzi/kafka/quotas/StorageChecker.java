@@ -31,13 +31,11 @@ public class StorageChecker implements Runnable {
 
     private volatile long storageCheckIntervalMillis;
     private volatile List<Path> logDirs;
-    private volatile Consumer<Long> totalUsageConsumer;
     private volatile Consumer<Map<String, Long>> perDiskUsageConsumer;
 
-    void configure(long storageCheckIntervalMillis, List<Path> logDirs, Consumer<Long> totalUsageConsumer, Consumer<Map<String, Long>> perDiskUsageConsumer) {
+    void configure(long storageCheckIntervalMillis, List<Path> logDirs, Consumer<Map<String, Long>> perDiskUsageConsumer) {
         this.storageCheckIntervalMillis = storageCheckIntervalMillis;
         this.logDirs = logDirs;
-        this.totalUsageConsumer = totalUsageConsumer;
         this.perDiskUsageConsumer = perDiskUsageConsumer;
     }
 
@@ -66,7 +64,6 @@ public class StorageChecker implements Runnable {
                         long totalDiskUsage = totalDiskUSage(usagePerDisk);
                         long previousUsage = storageUsed.getAndSet(totalDiskUsage);
                         if (totalDiskUsage != previousUsage) {
-                            totalUsageConsumer.accept(totalDiskUsage);
                             perDiskUsageConsumer.accept(usagePerDisk);
                         }
                         log.debug("Storage usage checked: {}", storageUsed.get());

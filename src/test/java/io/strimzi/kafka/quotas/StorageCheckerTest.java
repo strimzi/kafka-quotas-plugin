@@ -45,7 +45,7 @@ public class StorageCheckerTest {
     @SuppressWarnings("removal")
     @Test
     void storageCheckCheckDiskUsageZeroWhenMissing() throws Exception {
-        target.configure(0, List.of(tempDir), storage -> { }, diskUsage -> { });
+        target.configure(0, List.of(tempDir), diskUsage -> { });
         Files.delete(tempDir);
         assertEquals(0, target.checkDiskUsage());
     }
@@ -54,7 +54,7 @@ public class StorageCheckerTest {
     @Test
     void storageCheckCheckDiskUsageAtLeastFileSize() throws Exception {
         Path tempFile = Files.createTempFile(tempDir, "t", ".tmp");
-        target.configure(0, List.of(tempDir), storage -> { }, diskUsage -> { });
+        target.configure(0, List.of(tempDir), diskUsage -> { });
 
         Files.writeString(tempFile, "0123456789");
         long minSize = Files.size(tempFile);
@@ -64,7 +64,7 @@ public class StorageCheckerTest {
     @Test
     void shouldReturnNullWhenMissingLogDir() throws Exception {
         //Given
-        target.configure(0, List.of(tempDir), storage -> { }, diskUsage -> { });
+        target.configure(0, List.of(tempDir), diskUsage -> { });
         final String diskName = Files.getFileStore(tempDir).name();
         Files.delete(tempDir);
 
@@ -93,7 +93,7 @@ public class StorageCheckerTest {
     @Test
     void shouldGetDiskUsageFromMultipleLogDirs(@TempDir Path store1, @TempDir Path store2) throws Exception {
         //Given
-        target.configure(0, List.of(store1, store2), storage -> { }, diskUsage -> { });
+        target.configure(0, List.of(store1, store2), diskUsage -> { });
 
         long store1Size = prepareFileStore(store1, "0123456789");
         long store2Size = prepareFileStore(store2, "01234567893423543534");
@@ -109,22 +109,23 @@ public class StorageCheckerTest {
     @SuppressWarnings("removal")
     @Test
     void storageCheckCheckDiskUsageNotDoubled(@TempDir Path tempDir1, @TempDir Path tempDir2) throws Exception {
-        target.configure(0, List.of(tempDir1, tempDir2), storage -> { }, diskUsage -> { });
+        target.configure(0, List.of(tempDir1, tempDir2), diskUsage -> { });
 
         FileStore store = Files.getFileStore(tempDir1);
         assertEquals(store.getTotalSpace() - store.getUsableSpace(), target.checkDiskUsage());
     }
 
     @Test
-    void testStorageCheckerEmitsUsedStorageValue() throws Exception {
+    void testStorageCheckerEmitsUsedStorage() throws Exception {
         long minSize = prepareFileStore(tempDir, "0123456789");
 
-        CompletableFuture<Long> completableFuture = new CompletableFuture<>();
-        target.configure(25, List.of(tempDir), completableFuture::complete, diskUsage -> { });
+        CompletableFuture<Map<String, Long>> completableFuture = new CompletableFuture<>();
+        target.configure(25, List.of(tempDir), completableFuture::complete);
         target.startIfNecessary();
 
-        Long storage = completableFuture.get(1, TimeUnit.SECONDS);
-        assertTrue(storage >= minSize);
+        Map<String, Long> storagePerDisk = completableFuture.get(1, TimeUnit.SECONDS);
+
+        assertTrue(storagePerDisk.getOrDefault(Files.getFileStore(tempDir.toAbsolutePath()).name(), 0L) >= minSize);
     }
 
     private long prepareFileStore(Path fileStorePath, String fileContent) throws IOException {

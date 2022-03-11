@@ -149,10 +149,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
         long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
         List<Path> logDirs = config.getLogDirs().stream().map(Paths::get).collect(Collectors.toList());
-        storageChecker.configure(storageCheckIntervalMillis,
-                logDirs,
-                this::updateUsedStorage,
-                this::calculateQuotaFactor);
+        storageChecker.configure(storageCheckIntervalMillis, logDirs, this::calculateQuotaFactor);
 
         log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
         if (!excludedPrincipalNameList.isEmpty()) {
@@ -204,19 +201,12 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
     }
 
-    private void updateUsedStorage(Long newValue) {
-        var oldValue = storageUsed.getAndSet(newValue);
-        if (oldValue != newValue) {
-            resetQuota.set(true);
-        }
+    private boolean breachesHardLimit(long diskUsage) {
+        return diskUsage >= storageQuotaHard;
     }
 
-    private boolean breachesHardLimit(long currentStorageUsage) {
-        return currentStorageUsage >= storageQuotaHard;
-    }
-
-    private boolean breachesSoftLimitOnly(long currentStorageUsage) {
-        return currentStorageUsage > storageQuotaSoft && currentStorageUsage < storageQuotaHard;
+    private boolean breachesSoftLimitOnly(long diskUsage) {
+        return diskUsage > storageQuotaSoft && diskUsage < storageQuotaHard;
     }
 
     private MetricName metricName(Class<?> clazz, String name) {
