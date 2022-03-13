@@ -5,7 +5,6 @@
 package io.strimzi.kafka.quotas;
 
 import java.io.IOException;
-import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -18,7 +17,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -40,25 +38,6 @@ public class StorageCheckerTest {
         if (target != null) {
             target.stop();
         }
-    }
-
-    @SuppressWarnings("removal")
-    @Test
-    void storageCheckCheckDiskUsageZeroWhenMissing() throws Exception {
-        target.configure(0, List.of(tempDir), diskUsage -> { });
-        Files.delete(tempDir);
-        assertEquals(0, target.checkDiskUsage());
-    }
-
-    @SuppressWarnings("removal")
-    @Test
-    void storageCheckCheckDiskUsageAtLeastFileSize() throws Exception {
-        Path tempFile = Files.createTempFile(tempDir, "t", ".tmp");
-        target.configure(0, List.of(tempDir), diskUsage -> { });
-
-        Files.writeString(tempFile, "0123456789");
-        long minSize = Files.size(tempFile);
-        assertTrue(target.checkDiskUsage() >= minSize);
     }
 
     @Test
@@ -104,15 +83,6 @@ public class StorageCheckerTest {
         //Then
         assertTrue(diskUsage.get(Files.getFileStore(store1).name()) >= store1Size);
         assertTrue(diskUsage.get(Files.getFileStore(store2).name()) >= store2Size);
-    }
-
-    @SuppressWarnings("removal")
-    @Test
-    void storageCheckCheckDiskUsageNotDoubled(@TempDir Path tempDir1, @TempDir Path tempDir2) throws Exception {
-        target.configure(0, List.of(tempDir1, tempDir2), diskUsage -> { });
-
-        FileStore store = Files.getFileStore(tempDir1);
-        assertEquals(store.getTotalSpace() - store.getUsableSpace(), target.checkDiskUsage());
     }
 
     @Test

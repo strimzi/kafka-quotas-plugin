@@ -47,8 +47,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
     private final AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
     private final String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
-    //@VisibleForTesting
-    volatile Double currentQuotaFactor = 1.0;
+    /* test */volatile Double currentQuotaFactor = 1.0;
 
     public StaticQuotaCallback() {
         this(new StorageChecker());
@@ -178,8 +177,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         });
     }
 
-    //@VisiableForTesting
-    void calculateQuotaFactor(Map<String, Long> usagePerDisk) {
+    /* test */ void calculateQuotaFactor(Map<String, Long> usagePerDisk) {
         Double newFactor = 1.0D;
         for (Map.Entry<String, Long> diskUsage : usagePerDisk.entrySet()) {
             if (breachesHardLimit(diskUsage.getValue())) {
@@ -194,7 +192,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
                 newFactor = Math.min(newFactor, 1.0 - (1.0 * overQuotaUsage / quotaCapacity));
             }
         }
-        storageUsed.set(storageChecker.totalDiskUSage(usagePerDisk));
+        storageUsed.set(storageChecker.totalDiskUsage(usagePerDisk));
         if (Math.abs(currentQuotaFactor - newFactor) > EPSILON) {
             currentQuotaFactor = newFactor;
             resetQuota.set(true);

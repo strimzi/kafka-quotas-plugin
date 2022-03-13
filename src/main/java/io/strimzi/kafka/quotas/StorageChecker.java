@@ -6,9 +6,9 @@ package io.strimzi.kafka.quotas;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -61,7 +61,7 @@ public class StorageChecker implements Runnable {
                 while (running.get()) {
                     try {
                         final Map<String, Long> usagePerDisk = gatherDiskUsage();
-                        long totalDiskUsage = totalDiskUSage(usagePerDisk);
+                        long totalDiskUsage = totalDiskUsage(usagePerDisk);
                         long previousUsage = storageUsed.getAndSet(totalDiskUsage);
                         if (totalDiskUsage != previousUsage) {
                             perDiskUsageConsumer.accept(usagePerDisk);
@@ -81,12 +81,7 @@ public class StorageChecker implements Runnable {
         }
     }
 
-    @Deprecated(forRemoval = true, since = "0.3.0")
-    long checkDiskUsage() {
-        return totalDiskUSage(gatherDiskUsage());
-    }
-
-    long totalDiskUSage(Map<String, Long> diskUsage) {
+    long totalDiskUsage(Map<String, Long> diskUsage) {
         return diskUsage.values().stream().mapToLong(Long::longValue).sum();
     }
 
@@ -95,11 +90,12 @@ public class StorageChecker implements Runnable {
                 .filter(Files::exists)
                 .map(path -> apply(() -> Files.getFileStore(path)))
                 .distinct()
-                .map(store -> {
-                    final Long usedSpace = apply(() -> store.getTotalSpace() - store.getUsableSpace());
-                    return new AbstractMap.SimpleImmutableEntry<>(store.name(), usedSpace != null ? usedSpace : 0);
-                })
-                .collect(Collectors.toMap(AbstractMap.SimpleImmutableEntry::getKey, AbstractMap.SimpleImmutableEntry::getValue));
+                .collect(Collectors.toMap(FileStore::name, StorageChecker::calculateUsedSpace));
+    }
+
+    private static long calculateUsedSpace(FileStore store) {
+        Long usedSpace = apply(() -> store.getTotalSpace() - store.getUsableSpace());
+        return usedSpace != null ? usedSpace : 0;
     }
 
     static <T> T apply(IOSupplier<T> supplier) {
