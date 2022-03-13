@@ -182,7 +182,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         for (Map.Entry<String, Long> diskUsage : usagePerDisk.entrySet()) {
             if (breachesHardLimit(diskUsage.getValue())) {
                 newFactor = 0.0D;
-                maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
+                maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because  {} is full. Used: {}. Limit: {}", diskUsage.getKey(), diskUsage.getValue(), storageQuotaHard);
                 //If any disk is over the hard limit that hard limit is applied.
                 break;
             } else if (breachesSoftLimitOnly(diskUsage.getValue())) {
