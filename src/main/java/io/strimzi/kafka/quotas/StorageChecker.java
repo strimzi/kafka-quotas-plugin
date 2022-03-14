@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -24,18 +25,22 @@ import org.slf4j.LoggerFactory;
  */
 public class StorageChecker implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(StorageChecker.class);
+    public static final int UNKNOWN_USAGE_SENTINEL = -1;
 
     private final Thread storageCheckerThread = new Thread(this, "storage-quota-checker");
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicLong storageUsed = new AtomicLong(0);
 
     private volatile long storageCheckIntervalMillis;
-    private volatile List<Path> logDirs;
+    private volatile Set<FileStore> fileStores;
     private volatile Consumer<Map<String, Long>> perDiskUsageConsumer;
 
     void configure(long storageCheckIntervalMillis, List<Path> logDirs, Consumer<Map<String, Long>> perDiskUsageConsumer) {
         this.storageCheckIntervalMillis = storageCheckIntervalMillis;
-        this.logDirs = logDirs;
+        fileStores = logDirs.stream()
+                .filter(Files::exists)
+                .map(path -> apply(() -> Files.getFileStore(path)))
+                .collect(Collectors.toSet());
         this.perDiskUsageConsumer = perDiskUsageConsumer;
     }
 
@@ -55,7 +60,7 @@ public class StorageChecker implements Runnable {
 
     @Override
     public void run() {
-        if (logDirs != null && !logDirs.isEmpty()) {
+        if (fileStores != null && !fileStores.isEmpty()) {
             try {
                 log.info("Quota Storage Checker is now starting");
                 while (running.get()) {
@@ -86,16 +91,19 @@ public class StorageChecker implements Runnable {
     }
 
     Map<String, Long> gatherDiskUsage() {
-        return logDirs.stream()
-                .filter(Files::exists)
-                .map(path -> apply(() -> Files.getFileStore(path)))
-                .distinct()
+        return fileStores
+                .stream()
                 .collect(Collectors.toMap(FileStore::name, StorageChecker::calculateUsedSpace));
     }
 
-    private static long calculateUsedSpace(FileStore store) {
-        Long usedSpace = apply(() -> store.getTotalSpace() - store.getUsableSpace());
-        return usedSpace != null ? usedSpace : 0;
+    private static Long calculateUsedSpace(FileStore store) {
+        Long usedSpace = null;
+        try {
+            usedSpace = store.getTotalSpace() - store.getUsableSpace();
+        } catch (IOException e) {
+            log.warn("unable to read disk space for " + store.name() + " due to " + e.getMessage(), e);
+        }
+        return usedSpace != null ? usedSpace : UNKNOWN_USAGE_SENTINEL;
     }
 
     static <T> T apply(IOSupplier<T> supplier) {

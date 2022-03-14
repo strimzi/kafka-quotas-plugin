@@ -9,18 +9,24 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.SortedMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
+@ExtendWith(InMemoryFileStoreExtension.class)
 public class StorageCheckerTest {
 
     StorageChecker target;
@@ -41,7 +47,7 @@ public class StorageCheckerTest {
     }
 
     @Test
-    void shouldReturnNullWhenMissingLogDir() throws Exception {
+    void shouldUseErrorMarkerWhenMissingLogDir() throws Exception {
         //Given
         target.configure(0, List.of(tempDir), diskUsage -> { });
         final String diskName = Files.getFileStore(tempDir).name();
@@ -51,7 +57,7 @@ public class StorageCheckerTest {
         final Long diskUsage = target.gatherDiskUsage().get(diskName);
 
         //Then
-        assertNull(diskUsage);
+        assertEquals(-1, diskUsage);
     }
 
     @Test
@@ -70,7 +76,7 @@ public class StorageCheckerTest {
     }
 
     @Test
-    void shouldGetDiskUsageFromMultipleLogDirs(@TempDir Path store1, @TempDir Path store2) throws Exception {
+    void shouldGetDiskUsageFromMultipleLogDirs(@InMemoryFileStoreExtension.InMemoryFileStore Path store1, @TempDir Path store2) throws Exception {
         //Given
         target.configure(0, List.of(store1, store2), diskUsage -> { });
 
