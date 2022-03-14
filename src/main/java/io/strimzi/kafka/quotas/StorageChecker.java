@@ -12,11 +12,15 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Gauge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,13 +39,17 @@ public class StorageChecker implements Runnable {
     private volatile Set<FileStore> fileStores;
     private volatile Consumer<Map<String, Long>> perDiskUsageConsumer;
 
+    private final ConcurrentMap<String, Long> diskUsage = new ConcurrentHashMap<>();
+
     void configure(long storageCheckIntervalMillis, List<Path> logDirs, Consumer<Map<String, Long>> perDiskUsageConsumer) {
         this.storageCheckIntervalMillis = storageCheckIntervalMillis;
+        this.perDiskUsageConsumer = perDiskUsageConsumer;
+
         fileStores = logDirs.stream()
                 .filter(Files::exists)
                 .map(path -> apply(() -> Files.getFileStore(path)))
                 .collect(Collectors.toSet());
-        this.perDiskUsageConsumer = perDiskUsageConsumer;
+        fileStores.forEach(fs -> buildGauge(fs.name()));
     }
 
     void startIfNecessary() {
@@ -66,6 +74,8 @@ public class StorageChecker implements Runnable {
                 while (running.get()) {
                     try {
                         final Map<String, Long> usagePerDisk = gatherDiskUsage();
+                        diskUsage.clear();
+                        diskUsage.putAll(usagePerDisk);
                         long totalDiskUsage = totalDiskUsage(usagePerDisk);
                         long previousUsage = storageUsed.getAndSet(totalDiskUsage);
                         if (totalDiskUsage != previousUsage) {
@@ -114,8 +124,26 @@ public class StorageChecker implements Runnable {
         }
     }
 
+    private void buildGauge(String name) {
+        Metrics.newGauge(StaticQuotaCallback.metricName(StorageChecker.class, "StorageUsedBytes", Map.of("volume", name)), new NamedVolumeGauge(name));
+    }
+
     @FunctionalInterface
     interface IOSupplier<T> {
         T get() throws IOException;
+    }
+
+    private class NamedVolumeGauge extends Gauge<Long> {
+
+        private final String volumeName;
+
+        private NamedVolumeGauge(String volumeName) {
+            this.volumeName = volumeName;
+        }
+
+        @Override
+        public Long value() {
+            return diskUsage.get(volumeName);
+        }
     }
 }

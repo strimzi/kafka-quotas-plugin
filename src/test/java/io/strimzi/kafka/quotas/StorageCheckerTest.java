@@ -9,19 +9,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import com.yammer.metrics.core.Metric;
+import com.yammer.metrics.core.MetricName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
+import static io.strimzi.kafka.quotas.StaticQuotaCallbackTest.getMetricGroup;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(InMemoryFileStoreExtension.class)
 public class StorageCheckerTest {
 
+    private static final String MBEAN_NAME_FORMAT = "io.strimzi.kafka.quotas:type=StorageChecker,name=StorageUsedBytes,volume=%s";
     StorageChecker target;
 
     @TempDir
@@ -102,6 +105,24 @@ public class StorageCheckerTest {
         Map<String, Long> storagePerDisk = completableFuture.get(1, TimeUnit.SECONDS);
 
         assertTrue(storagePerDisk.getOrDefault(Files.getFileStore(tempDir.toAbsolutePath()).name(), 0L) >= minSize);
+    }
+
+    @Test
+    void shouldCreateMetricsPerVolume(@InMemoryFileStoreExtension.InMemoryFileStore Path store1) throws IOException {
+        //Given
+        final String tempDirVolumeName = Files.getFileStore(tempDir).name();
+        final String store1Name = Files.getFileStore(store1).name();
+
+        //When
+        target.configure(0, List.of(tempDir, store1), diskUsage -> { });
+
+        //Then
+        SortedMap<MetricName, Metric> group = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "StorageChecker");
+
+        // the mbean name is part of the public api
+        Set<String> names = group.keySet().stream().map(MetricName::getMBeanName).collect(Collectors.toSet());
+        assertTrue(names.contains(String.format(MBEAN_NAME_FORMAT, tempDirVolumeName)), "mbean for " + tempDirVolumeName + " missing");
+        assertTrue(names.contains(String.format(MBEAN_NAME_FORMAT, store1Name)), "mbean for " + store1Name + " missing");
     }
 
     private long prepareFileStore(Path fileStorePath, String fileContent) throws IOException {

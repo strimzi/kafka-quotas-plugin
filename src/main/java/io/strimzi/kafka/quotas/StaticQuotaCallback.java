@@ -46,7 +46,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final static long LOGGING_DELAY_MS = 1000;
     private final AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
     private final AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
-    private final String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
+    private static final String SCOPE = "io.strimzi.kafka.quotas.StaticQuotaCallback";
     /* test */volatile Double currentQuotaFactor = 1.0;
 
     public StaticQuotaCallback() {
@@ -134,7 +134,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         } finally {
-            Metrics.defaultRegistry().allMetrics().keySet().stream().filter(m -> scope.equals(m.getScope())).forEach(Metrics.defaultRegistry()::removeMetric);
+            Metrics.defaultRegistry().allMetrics().keySet().stream().filter(m -> SCOPE.equals(m.getScope())).forEach(Metrics.defaultRegistry()::removeMetric);
         }
     }
 
@@ -207,11 +207,20 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         return diskUsage > storageQuotaSoft && diskUsage < storageQuotaHard;
     }
 
-    private MetricName metricName(Class<?> clazz, String name) {
+    static MetricName metricName(Class<?> clazz, String name) {
+        return metricName(clazz, name, Map.of());
+    }
+
+    static MetricName metricName(Class<?> clazz, String name, Map<String, String> labels) {
         String group = clazz.getPackageName();
         String type = clazz.getSimpleName();
-        String mBeanName = String.format("%s:type=%s,name=%s", group, type, name);
-        return new MetricName(group, type, name, this.scope, mBeanName);
+        final String labelValues = labels.size() > 0 ? buildLabelString(labels) : "";
+        String mBeanName = String.format("%s:type=%s,name=%s%s", group, type, name, labelValues);
+        return new MetricName(group, type, name, SCOPE, mBeanName);
+    }
+
+    private static String buildLabelString(Map<String, String> labels) {
+        return labels.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).collect(Collectors.joining(",", ",", ""));
     }
 
     private static class ClientQuotaGauge extends Gauge<Double> {

@@ -396,8 +396,8 @@ class StaticQuotaCallbackTest {
         assertEquals(1.0, quotaLimit, EPSILON);
     }
 
-    private SortedMap<MetricName, Metric> getMetricGroup(String p, String t) {
-        SortedMap<String, SortedMap<MetricName, Metric>> storageMetrics = Metrics.defaultRegistry().groupedMetrics((name, metric) -> p.equals(name.getScope()) && t.equals(name.getType()));
+    public static SortedMap<MetricName, Metric> getMetricGroup(String scope, String type) {
+        SortedMap<String, SortedMap<MetricName, Metric>> storageMetrics = Metrics.defaultRegistry().groupedMetrics((name, metric) -> scope.equals(name.getScope()) && type.equals(name.getType()));
         assertEquals(1, storageMetrics.size(), "unexpected number of metrics in group");
         return storageMetrics.entrySet().iterator().next().getValue();
     }
