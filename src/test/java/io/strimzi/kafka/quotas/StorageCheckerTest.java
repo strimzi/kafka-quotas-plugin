@@ -57,10 +57,10 @@ public class StorageCheckerTest {
         Files.delete(tempDir);
 
         //When
-        final Long diskUsage = target.gatherDiskUsage().get(diskName);
+        final VolumeDetails diskUsage = target.gatherDiskUsage().get(diskName);
 
         //Then
-        assertEquals(-1, diskUsage);
+        assertEquals(-1, diskUsage.getConsumedCapacity());
     }
 
     @Test
@@ -72,10 +72,10 @@ public class StorageCheckerTest {
         final String diskName = Files.getFileStore(tempDir).name();
 
         //When
-        final Long diskUsage = target.gatherDiskUsage().get(diskName);
+        final VolumeDetails diskUsage = target.gatherDiskUsage().get(diskName);
 
         //Then
-        assertTrue(diskUsage >= minSize);
+        assertTrue(diskUsage.getConsumedCapacity() >= minSize);
     }
 
     @Test
@@ -87,24 +87,24 @@ public class StorageCheckerTest {
         long store2Size = prepareFileStore(store2, "01234567893423543534");
 
         //When
-        final Map<String, Long> diskUsage = target.gatherDiskUsage();
+        final Map<String, VolumeDetails> diskUsage = target.gatherDiskUsage();
 
         //Then
-        assertTrue(diskUsage.get(Files.getFileStore(store1).name()) >= store1Size);
-        assertTrue(diskUsage.get(Files.getFileStore(store2).name()) >= store2Size);
+        assertTrue(diskUsage.get(Files.getFileStore(store1).name()).getConsumedCapacity() >= store1Size);
+        assertTrue(diskUsage.get(Files.getFileStore(store2).name()).getConsumedCapacity() >= store2Size);
     }
 
     @Test
     void testStorageCheckerEmitsUsedStorage() throws Exception {
         long minSize = prepareFileStore(tempDir, "0123456789");
 
-        CompletableFuture<Map<String, Long>> completableFuture = new CompletableFuture<>();
+        CompletableFuture<Map<String, VolumeDetails>> completableFuture = new CompletableFuture<>();
         target.configure(25, List.of(tempDir), completableFuture::complete);
         target.startIfNecessary();
 
-        Map<String, Long> storagePerDisk = completableFuture.get(1, TimeUnit.SECONDS);
+        Map<String, VolumeDetails> storagePerDisk = completableFuture.get(1, TimeUnit.SECONDS);
 
-        assertTrue(storagePerDisk.getOrDefault(Files.getFileStore(tempDir.toAbsolutePath()).name(), 0L) >= minSize);
+        assertTrue(storagePerDisk.getOrDefault(Files.getFileStore(tempDir.toAbsolutePath()).name(), new VolumeDetails("Test", 0L, 0L)).getConsumedCapacity() >= minSize);
     }
 
     @Test

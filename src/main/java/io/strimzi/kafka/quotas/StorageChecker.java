@@ -11,7 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -36,20 +35,20 @@ public class StorageChecker implements Runnable {
     private final AtomicLong storageUsed = new AtomicLong(0);
 
     private volatile long storageCheckIntervalMillis;
-    private volatile Set<FileStore> fileStores;
-    private volatile Consumer<Map<String, Long>> perDiskUsageConsumer;
+    private volatile Map<String, FileStore> fileStores;
+    private volatile Consumer<Map<String, VolumeDetails>> perDiskUsageConsumer;
 
-    private final ConcurrentMap<String, Long> diskUsage = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, VolumeDetails> diskUsage = new ConcurrentHashMap<>();
 
-    void configure(long storageCheckIntervalMillis, List<Path> logDirs, Consumer<Map<String, Long>> perDiskUsageConsumer) {
+    void configure(long storageCheckIntervalMillis, List<Path> logDirs, Consumer<Map<String, VolumeDetails>> perDiskUsageConsumer) {
         this.storageCheckIntervalMillis = storageCheckIntervalMillis;
         this.perDiskUsageConsumer = perDiskUsageConsumer;
 
         fileStores = logDirs.stream()
                 .filter(Files::exists)
                 .map(path -> apply(() -> Files.getFileStore(path)))
-                .collect(Collectors.toSet());
-        fileStores.forEach(fs -> buildGauge(fs.name()));
+                .collect(Collectors.toMap(FileStore::name, fileStore -> fileStore));
+        fileStores.forEach((name, fs) -> buildGauge(name));
     }
 
     void startIfNecessary() {
@@ -73,7 +72,7 @@ public class StorageChecker implements Runnable {
                 log.info("Quota Storage Checker is now starting");
                 while (running.get()) {
                     try {
-                        final Map<String, Long> usagePerDisk = gatherDiskUsage();
+                        final Map<String, VolumeDetails> usagePerDisk = gatherDiskUsage();
                         diskUsage.clear();
                         diskUsage.putAll(usagePerDisk);
                         long totalDiskUsage = totalDiskUsage(usagePerDisk);
@@ -96,24 +95,24 @@ public class StorageChecker implements Runnable {
         }
     }
 
-    long totalDiskUsage(Map<String, Long> diskUsage) {
-        return diskUsage.values().stream().mapToLong(Long::longValue).sum();
+    long totalDiskUsage(Map<String, VolumeDetails> diskUsage) {
+        return diskUsage.values().stream().mapToLong(VolumeDetails::getConsumedCapacity).sum();
     }
 
-    Map<String, Long> gatherDiskUsage() {
+    Map<String, VolumeDetails> gatherDiskUsage() {
         return fileStores
+                .entrySet()
                 .stream()
-                .collect(Collectors.toMap(FileStore::name, StorageChecker::calculateUsedSpace));
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> calculateUsedSpace(entry.getValue())));
     }
 
-    private static Long calculateUsedSpace(FileStore store) {
-        Long usedSpace = null;
+    private static VolumeDetails calculateUsedSpace(FileStore store) {
         try {
-            usedSpace = store.getTotalSpace() - store.getUsableSpace();
+            return new VolumeDetails(store.name(), store.getTotalSpace(), store.getUsableSpace());
         } catch (IOException e) {
             log.warn("unable to read disk space for " + store.name() + " due to " + e.getMessage(), e);
         }
-        return usedSpace != null ? usedSpace : UNKNOWN_USAGE_SENTINEL;
+        return new VolumeDetails(store.name(), -1L, -1L);
     }
 
     static <T> T apply(IOSupplier<T> supplier) {
@@ -126,6 +125,10 @@ public class StorageChecker implements Runnable {
 
     private void buildGauge(String name) {
         Metrics.newGauge(StaticQuotaCallback.metricName(StorageChecker.class, "StorageUsedBytes", Map.of("volume", name)), new NamedVolumeGauge(name));
+    }
+
+    public long getCapacity(String volumeName) {
+        return 0;
     }
 
     @FunctionalInterface
@@ -143,7 +146,7 @@ public class StorageChecker implements Runnable {
 
         @Override
         public Long value() {
-            return diskUsage.get(volumeName);
+            return diskUsage.get(volumeName).getConsumedCapacity();
         }
     }
 }

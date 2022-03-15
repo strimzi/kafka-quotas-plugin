@@ -17,6 +17,8 @@ import java.util.stream.Collectors;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricName;
+import io.strimzi.kafka.quotas.policy.QuotaPolicy;
+import io.strimzi.kafka.quotas.policy.UnlimitedQuotaPolicy;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
@@ -34,12 +36,11 @@ import static java.util.Locale.ENGLISH;
 public class StaticQuotaCallback implements ClientQuotaCallback {
     private static final Logger log = LoggerFactory.getLogger(StaticQuotaCallback.class);
     private static final String EXCLUDED_PRINCIPAL_QUOTA_KEY = "excluded-principal-quota-key";
-    private static final double EPSILON = 1E-5;
+    public static final double EPSILON = 1E-5;
 
     private volatile Map<ClientQuotaType, Quota> quotaMap = new HashMap<>();
     private final AtomicLong storageUsed = new AtomicLong(0);
-    private volatile long storageQuotaSoft = Long.MAX_VALUE;
-    private volatile long storageQuotaHard = Long.MAX_VALUE;
+    private volatile QuotaPolicy quotaPolicy = UnlimitedQuotaPolicy.INSTANCE;
     private volatile List<String> excludedPrincipalNameList = List.of();
     private final AtomicBoolean resetQuota = new AtomicBoolean(true);
     private final StorageChecker storageChecker;
@@ -47,7 +48,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
     private final AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
     private static final String SCOPE = "io.strimzi.kafka.quotas.StaticQuotaCallback";
-    /* test */volatile Double currentQuotaFactor = 1.0;
+    /* test */ volatile Double currentQuotaFactor = 1.0;
 
     public StaticQuotaCallback() {
         this(new StorageChecker());
@@ -75,7 +76,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
         // Don't allow producing messages if we're beyond the storage limit.
         if (ClientQuotaType.PRODUCE.equals(quotaType)) {
-            double minThrottle = quotaMap.getOrDefault(quotaType, Quota.upperBound(currentQuotaFactor)).bound();
+            double minThrottle = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
             final double produceQuota = minThrottle * currentQuotaFactor;
             final double limit = Math.max(produceQuota, 1.0D);
             maybeLog(lastLoggedMessageSoftTimeMs, "Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed.get(), limit);
@@ -142,15 +143,15 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     public void configure(Map<String, ?> configs) {
         StaticQuotaConfig config = new StaticQuotaConfig(configs, true);
         quotaMap = config.getQuotaMap();
-        storageQuotaSoft = config.getSoftStorageQuota();
-        storageQuotaHard = config.getHardStorageQuota();
         excludedPrincipalNameList = config.getExcludedPrincipalNameList();
 
         long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
         List<Path> logDirs = config.getLogDirs().stream().map(Paths::get).collect(Collectors.toList());
         storageChecker.configure(storageCheckIntervalMillis, logDirs, this::calculateQuotaFactor);
 
-        log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
+        quotaPolicy = config.getQuotaPolicy();
+
+        log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, quotaPolicy.getSoftLimit(), quotaPolicy.getHardLimit(), storageCheckIntervalMillis);
         if (!excludedPrincipalNameList.isEmpty()) {
             log.info("Excluded principals {}", excludedPrincipalNameList);
         }
@@ -160,14 +161,16 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
                 return storageUsed.get();
             }
         });
+        //TODO doesn't really make sense if the policy is percentage based. It could still make sense per volume
         Metrics.newGauge(metricName(StorageChecker.class, "SoftLimitBytes"), new Gauge<Long>() {
             public Long value() {
-                return storageQuotaSoft;
+                return quotaPolicy.getSoftLimit().longValue();
             }
         });
+        //TODO doesn't really make sense if the policy is percentage based. It could still make sense per volume
         Metrics.newGauge(metricName(StorageChecker.class, "HardLimitBytes"), new Gauge<Long>() {
             public Long value() {
-                return storageQuotaHard;
+                return quotaPolicy.getHardLimit().longValue();
             }
         });
 
@@ -177,19 +180,17 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         });
     }
 
-    /* test */ void calculateQuotaFactor(Map<String, Long> usagePerDisk) {
+    /* test */ void calculateQuotaFactor(Map<String, VolumeDetails> usagePerDisk) {
         Double newFactor = 1.0D;
-        for (Map.Entry<String, Long> diskUsage : usagePerDisk.entrySet()) {
-            if (breachesHardLimit(diskUsage.getValue())) {
+        for (Map.Entry<String, VolumeDetails> diskUsage : usagePerDisk.entrySet()) {
+            if (quotaPolicy.breachesHardLimit(diskUsage.getValue())) {
                 newFactor = 0.0D;
-                maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because  {} is full. Used: {}. Limit: {}", diskUsage.getKey(), diskUsage.getValue(), storageQuotaHard);
+                maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because  {} is full. Used: {}. Limit: {}", diskUsage.getKey(), diskUsage.getValue(), quotaPolicy.getHardLimit());
                 //If any disk is over the hard limit that hard limit is applied.
                 break;
-            } else if (breachesSoftLimitOnly(diskUsage.getValue())) {
-                final long overQuotaUsage = diskUsage.getValue() - storageQuotaSoft;
-                final long quotaCapacity = storageQuotaHard - storageQuotaSoft;
+            } else if (quotaPolicy.breachesSoftLimit(diskUsage.getValue())) {
                 //Apply the most aggressive factor across all the disks
-                newFactor = Math.min(newFactor, 1.0 - (1.0 * overQuotaUsage / quotaCapacity));
+                newFactor = Math.min(newFactor, quotaPolicy.quotaFactor(diskUsage.getValue()));
             }
         }
         storageUsed.set(storageChecker.totalDiskUsage(usagePerDisk));
@@ -199,12 +200,8 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
     }
 
-    private boolean breachesHardLimit(long diskUsage) {
-        return diskUsage >= storageQuotaHard;
-    }
-
-    private boolean breachesSoftLimitOnly(long diskUsage) {
-        return diskUsage > storageQuotaSoft && diskUsage < storageQuotaHard;
+    boolean breachesHardLimit(VolumeDetails volumeDetails) {
+        return quotaPolicy.breachesHardLimit(volumeDetails);
     }
 
     static MetricName metricName(Class<?> clazz, String name) {

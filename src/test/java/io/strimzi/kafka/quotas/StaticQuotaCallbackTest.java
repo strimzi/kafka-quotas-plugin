@@ -32,7 +32,13 @@ import static org.mockito.Mockito.verify;
 
 class StaticQuotaCallbackTest {
 
-    public static final double EPSILON = 1E-5;
+    private static final double EPSILON = 1E-5;
+    private static final long ONE_GB = 1_073_741_824L;
+    private static final long TWO_GB = 2 * ONE_GB;
+    private static final long NINE_GB = 9 * ONE_GB;
+    private static final long TEN_GB = 10 * ONE_GB;
+    public static final VolumeDetails TEN_PERCENT_USED_VOLUME = new VolumeDetails("Test", TEN_GB, ONE_GB);
+
     StaticQuotaCallback target;
 
     @BeforeEach
@@ -70,7 +76,7 @@ class StaticQuotaCallbackTest {
     void excludedPrincipal() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
         target.configure(Map.of(StaticQuotaConfig.EXCLUDED_PRINCIPAL_NAME_LIST_PROP, "foo,bar",
-                                StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024));
+                StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024));
         double fooQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(Double.MAX_VALUE, fooQuotaLimit);
 
@@ -90,22 +96,23 @@ class StaticQuotaCallbackTest {
         verify(mock, times(1)).stop();
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     void quotaResetRequired() {
         //Given
         StorageChecker mock = mock(StorageChecker.class);
-        ArgumentCaptor<Consumer<Map<String, Long>>> argument = ArgumentCaptor.forClass(Consumer.class);
+        ArgumentCaptor<Consumer<Map<String, VolumeDetails>>> argument = ArgumentCaptor.forClass(Consumer.class);
         doNothing().when(mock).configure(anyLong(), anyList(), argument.capture());
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock);
         quotaCallback.configure(Map.of());
-        Consumer<Map<String, Long>> storageUpdateConsumer = argument.getValue();
+        Consumer<Map<String, VolumeDetails>> storageUpdateConsumer = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
         quotaCallback.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
         ));
-        final Map<String, Long> underQuotaUsage = Map.of("Disk one", 8L);
-        final Map<String, Long> overQuotaUsage = Map.of("Disk one", 12L);
+        final Map<String, VolumeDetails> underQuotaUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(8L));
+        final Map<String, VolumeDetails> overQuotaUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(12L));
 
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
@@ -138,7 +145,7 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 16L
         ));
 
-        target.calculateQuotaFactor(Map.of("Disk one", 17L));
+        target.calculateQuotaFactor(Map.of("Disk one", newVolumeWithConsumedCapacity(17L)));
 
         SortedMap<MetricName, Metric> group = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "StorageChecker");
 
@@ -176,7 +183,7 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldSetQuotaFactorToZeroIfHardLimitBreached() {
         //Given
-        final Map<String, Long> diskUsage = Map.of("Disk one", 20L);
+        final Map<String, VolumeDetails> diskUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(20L));
         target.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
@@ -192,7 +199,7 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldSetQuotaFactorToZeroIfUsageIsEqualToHardLimit() {
         //Given
-        final Map<String, Long> diskUsage = Map.of("Disk one", 15L);
+        final Map<String, VolumeDetails> diskUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(15L));
         target.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
@@ -208,7 +215,7 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldReduceQuotaFactorIfUsageBetweenSoftAndHardLimits() {
         //Given
-        final Map<String, Long> usagePerDisk = Map.of("Disk one", 12L);
+        final Map<String, VolumeDetails> usagePerDisk = Map.of("Disk one", newVolumeWithConsumedCapacity(12L));
         target.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
@@ -224,7 +231,7 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldSetQuotaFactorToZeroIfHardLimitBreachedForAnyDisk() {
         //Given
-        final Map<String, Long> diskUsage = Map.of("Disk one", 8L, "Disk Two", 20L);
+        final Map<String, VolumeDetails> diskUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(8L), "Disk Two", newVolumeWithConsumedCapacity(20L));
         target.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
@@ -240,7 +247,7 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldReduceQuotaFactorIfUsageBetweenSoftAndHardLimitsForOneDisk() {
         //Given
-        final Map<String, Long> usagePerDisk = Map.of("Disk one", 8L, "Disk Two", 12L);
+        final Map<String, VolumeDetails> usagePerDisk = Map.of("Disk one", newVolumeWithConsumedCapacity(8L), "Disk Two", newVolumeWithConsumedCapacity(12L));
         target.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
@@ -256,7 +263,7 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldUseTheSmallestFactorWhenMultipleDisksAreOverTheSoftLimit() {
         //Given
-        final Map<String, Long> usagePerDisk = Map.of("Disk one", 14L, "Disk Two", 12L);
+        final Map<String, VolumeDetails> usagePerDisk = Map.of("Disk one", newVolumeWithConsumedCapacity(14L), "Disk Two", newVolumeWithConsumedCapacity(12L));
         target.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
@@ -274,7 +281,7 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldApplyHardLimitInPreferenceToSoftLimit() {
         //Given
-        final Map<String, Long> diskUsage = Map.of("Disk one", 12L, "Disk Two", 20L);
+        final Map<String, VolumeDetails> diskUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(12L), "Disk Two", newVolumeWithConsumedCapacity(20L));
         target.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
@@ -290,7 +297,7 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldSetQuotaFactorToOneIfUsageBelowSoftAndHardLimits() {
         //Given
-        final Map<String, Long> diskUsage = Map.of("Disk one", 8L);
+        final Map<String, VolumeDetails> diskUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(8L));
         target.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
@@ -310,8 +317,8 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
         ));
-        final Map<String, Long> underQuotaUsage = Map.of("Disk one", 8L);
-        final Map<String, Long> overQuotaUsage = Map.of("Disk one", 12L);
+        final Map<String, VolumeDetails> underQuotaUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(8L));
+        final Map<String, VolumeDetails> overQuotaUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(12L));
         target.calculateQuotaFactor(underQuotaUsage);
         assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE)); //quotaResetRequired resets the flag to false
         assertFalse(target.quotaResetRequired(ClientQuotaType.PRODUCE));
@@ -330,8 +337,8 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
         ));
-        final Map<String, Long> underQuotaUsage = Map.of("Disk one", 16L);
-        final Map<String, Long> overQuotaUsage = Map.of("Disk one", 12L);
+        final Map<String, VolumeDetails> underQuotaUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(16L));
+        final Map<String, VolumeDetails> overQuotaUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(12L));
         target.calculateQuotaFactor(underQuotaUsage);
         assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE)); //quotaResetRequired resets the flag to false
         assertFalse(target.quotaResetRequired(ClientQuotaType.PRODUCE));
@@ -350,7 +357,7 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 10L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
         ));
-        final Map<String, Long> underQuotaUsage = Map.of("Disk one", 8L);
+        final Map<String, VolumeDetails> underQuotaUsage = Map.of("Disk one", newVolumeWithConsumedCapacity(8L));
         target.calculateQuotaFactor(underQuotaUsage);
         assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE));
 
@@ -370,7 +377,7 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
         ));
 
-        final Map<String, Long> overSoftQuota = Map.of("Disk one", 12L);
+        final Map<String, VolumeDetails> overSoftQuota = Map.of("Disk one", newVolumeWithConsumedCapacity(12L));
         target.calculateQuotaFactor(overSoftQuota);
         assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE));
 
@@ -388,18 +395,52 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 15L
         ));
 
-        final Map<String, Long> pverHardQuota = Map.of("Disk one", 16L);
-        target.calculateQuotaFactor(pverHardQuota);
+        final Map<String, VolumeDetails> overHardQuota = Map.of("Disk one", newVolumeWithConsumedCapacity(16L));
+        target.calculateQuotaFactor(overHardQuota);
         assertTrue(target.quotaResetRequired(ClientQuotaType.PRODUCE));
 
         double quotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(1.0, quotaLimit, EPSILON);
     }
 
+    @Test
+    void shouldReturnTrueIfFreeCapacityBreachesHardLimitBytes() {
+        //Given
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_FREE_BYTES_PROP, TEN_GB,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_FREE_BYTES_PROP, ONE_GB
+        ));
+
+        //When
+        final boolean breachesSoftLimitOnly = target.breachesHardLimit(new VolumeDetails("Test", TEN_GB, TEN_GB));
+
+        //Then
+        assertTrue(breachesSoftLimitOnly);
+    }
+
+    @Test
+    void shouldReturnTrueIfFreeCapacityBreachesHardLimitPercentage() {
+        //Given
+        target.configure(Map.of(
+                StaticQuotaConfig.STORAGE_QUOTA_SOFT_FREE_PERCENT_PROP, 0.9,
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_FREE_PERCENT_PROP, 0.99
+        ));
+
+        //When
+        final boolean breachesSoftLimitOnly = target.breachesHardLimit(new VolumeDetails("Test", TEN_GB, TEN_GB));
+
+        //Then
+        assertTrue(breachesSoftLimitOnly);
+    }
+
     public static SortedMap<MetricName, Metric> getMetricGroup(String scope, String type) {
         SortedMap<String, SortedMap<MetricName, Metric>> storageMetrics = Metrics.defaultRegistry().groupedMetrics((name, metric) -> scope.equals(name.getScope()) && type.equals(name.getType()));
         assertEquals(1, storageMetrics.size(), "unexpected number of metrics in group");
         return storageMetrics.entrySet().iterator().next().getValue();
+    }
+
+    private VolumeDetails newVolumeWithConsumedCapacity(long consumedCapacity) {
+        return new VolumeDetails("TestVolume", 100L, consumedCapacity);
     }
 
     private <T> void assertGaugeMetric(SortedMap<MetricName, Metric> metrics, String name, T expected) {
