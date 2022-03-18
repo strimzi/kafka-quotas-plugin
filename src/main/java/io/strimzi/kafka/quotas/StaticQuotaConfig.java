@@ -86,30 +86,6 @@ public class StaticQuotaConfig extends AbstractConfig {
         return m;
     }
 
-    Long getHardStorageUsedQuota() {
-        return getLong(STORAGE_QUOTA_HARD_PROP);
-    }
-
-    Long getHardFreeStorageBytes() {
-        return getLong(STORAGE_QUOTA_HARD_FREE_BYTES_PROP);
-    }
-
-    Double getHardFreeStoragePercentage() {
-        return getDouble(STORAGE_QUOTA_HARD_FREE_PERCENT_PROP);
-    }
-
-    Long getSoftStorageUsedQuota() {
-        return getLong(STORAGE_QUOTA_SOFT_PROP);
-    }
-
-    Long getSoftFreeStorageBytes() {
-        return getLong(STORAGE_QUOTA_SOFT_FREE_BYTES_PROP);
-    }
-
-    Double getSoftFreeStoragePercentage() {
-        return getDouble(STORAGE_QUOTA_SOFT_FREE_PERCENT_PROP);
-    }
-
     int getStorageCheckInterval() {
         return getInt(STORAGE_CHECK_INTERVAL_PROP);
     }
