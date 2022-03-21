@@ -1,8 +1,7 @@
 /*
- * Copyright 2022, Red Hat Inc.
+ * Copyright Strimzi authors.
  * License: Apache License 2.0 (see the file LICENSE or http://apache.org/licenses/LICENSE-2.0.html).
  */
-
 package io.strimzi.kafka.quotas.policy;
 
 import java.util.function.Supplier;
@@ -10,6 +9,9 @@ import java.util.function.Supplier;
 import io.strimzi.kafka.quotas.StaticQuotaCallback;
 import io.strimzi.kafka.quotas.VolumeDetails;
 
+/**
+ * A quota policy which applies the most conservative of either free bytes or free percentage polices.
+ */
 public class MostConservativeQuotaPolicy implements QuotaPolicy {
 
     private final QuotaPolicy freeBytesQuotaPolicy;

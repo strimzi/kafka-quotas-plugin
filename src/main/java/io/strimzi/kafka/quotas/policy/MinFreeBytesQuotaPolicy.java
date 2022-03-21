@@ -6,11 +6,21 @@ package io.strimzi.kafka.quotas.policy;
 
 import io.strimzi.kafka.quotas.VolumeDetails;
 
+/**
+ * A quota policy that applies its limits when there are fewer than the configured number of bytes available on a given volume.
+ */
 public class MinFreeBytesQuotaPolicy implements QuotaPolicy {
 
     private final long softLimitMinFreeBytes;
     private final long hardLimitMinFreeBytes;
 
+    /**
+     * Use <code>0L</code> to signal no limit
+     * Note: <code>null</code> will be interpreted as a limit of 0L.
+     *
+     * @param softLimitMinFreeBytes The minimum number of bytes which must be available after which the policy starts throttling.
+     * @param hardLimitMinFreeBytes The minimum number of bytes which must be available after which the policy is fully throttled.
+     */
     public MinFreeBytesQuotaPolicy(Long softLimitMinFreeBytes, Long hardLimitMinFreeBytes) {
         this.softLimitMinFreeBytes = softLimitMinFreeBytes != null ? softLimitMinFreeBytes : 0L;
         this.hardLimitMinFreeBytes = hardLimitMinFreeBytes != null ? hardLimitMinFreeBytes : 0L;

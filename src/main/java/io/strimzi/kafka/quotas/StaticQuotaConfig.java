@@ -99,6 +99,12 @@ public class StaticQuotaConfig extends AbstractConfig {
         return getList(EXCLUDED_PRINCIPAL_NAME_LIST_PROP);
     }
 
+    /**
+     * From the configured properties determine which @link {@link QuotaPolicy} is configured.
+     *
+     * This will select a free space policy in preference to a consumed space policy when both are configured.
+     * @return The configured <code>QuotaPolicy</code>
+     */
     QuotaPolicy getQuotaPolicy() {
         final Long softFreeBytes = getLong(STORAGE_QUOTA_SOFT_FREE_BYTES_PROP);
         final Long hardFreeBytes = getLong(STORAGE_QUOTA_HARD_FREE_BYTES_PROP);

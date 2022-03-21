@@ -6,12 +6,20 @@ package io.strimzi.kafka.quotas.policy;
 
 import io.strimzi.kafka.quotas.VolumeDetails;
 
+/**
+ * A quota policy which applies its limits once the consumed disk space passes a configured level.
+ */
 public class ConsumedSpaceQuotaPolicy implements QuotaPolicy {
 
     private final long softLimitUsedBytes;
 
     private final long hardLimitUsedBytes;
 
+    /**
+     * Use <code>Long.MAX_VALUE</code> to signal no limit
+     * @param softLimitUsedBytes The number of bytes after which the policy starts throttling.
+     * @param hardLimitUsedBytes The number of bytes after which the policy is fully throttled.
+     */
     public ConsumedSpaceQuotaPolicy(long softLimitUsedBytes, long hardLimitUsedBytes) {
         this.softLimitUsedBytes = softLimitUsedBytes;
         this.hardLimitUsedBytes = hardLimitUsedBytes;
