@@ -200,10 +200,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
     }
 
-    boolean breachesHardLimit(VolumeDetails volumeDetails) {
-        return quotaPolicy.breachesHardLimit(volumeDetails);
-    }
-
     static MetricName metricName(Class<?> clazz, String name) {
         return metricName(clazz, name, Map.of());
     }

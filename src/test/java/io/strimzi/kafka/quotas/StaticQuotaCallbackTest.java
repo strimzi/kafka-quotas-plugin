@@ -403,36 +403,6 @@ class StaticQuotaCallbackTest {
         assertEquals(1.0, quotaLimit, EPSILON);
     }
 
-    @Test
-    void shouldReturnTrueIfFreeCapacityBreachesHardLimitBytes() {
-        //Given
-        target.configure(Map.of(
-                StaticQuotaConfig.STORAGE_QUOTA_SOFT_FREE_BYTES_PROP, TEN_GB,
-                StaticQuotaConfig.STORAGE_QUOTA_HARD_FREE_BYTES_PROP, ONE_GB
-        ));
-
-        //When
-        final boolean breachesSoftLimitOnly = target.breachesHardLimit(new VolumeDetails("Test", TEN_GB, TEN_GB));
-
-        //Then
-        assertTrue(breachesSoftLimitOnly);
-    }
-
-    @Test
-    void shouldReturnTrueIfFreeCapacityBreachesHardLimitPercentage() {
-        //Given
-        target.configure(Map.of(
-                StaticQuotaConfig.STORAGE_QUOTA_SOFT_FREE_PERCENT_PROP, 0.9,
-                StaticQuotaConfig.STORAGE_QUOTA_HARD_FREE_PERCENT_PROP, 0.99
-        ));
-
-        //When
-        final boolean breachesSoftLimitOnly = target.breachesHardLimit(new VolumeDetails("Test", TEN_GB, TEN_GB));
-
-        //Then
-        assertTrue(breachesSoftLimitOnly);
-    }
-
     public static SortedMap<MetricName, Metric> getMetricGroup(String scope, String type) {
         SortedMap<String, SortedMap<MetricName, Metric>> storageMetrics = Metrics.defaultRegistry().groupedMetrics((name, metric) -> scope.equals(name.getScope()) && type.equals(name.getType()));
         assertEquals(1, storageMetrics.size(), "unexpected number of metrics in group");
