@@ -8,10 +8,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.strimzi.kafka.quotas.policy.CompositeFreePolicy;
 import io.strimzi.kafka.quotas.policy.ConsumedSpaceQuotaPolicy;
 import io.strimzi.kafka.quotas.policy.MinFreeBytesQuotaPolicy;
 import io.strimzi.kafka.quotas.policy.MinFreePercentageQuotaPolicy;
+import io.strimzi.kafka.quotas.policy.MostConservativeQuotaPolicy;
 import io.strimzi.kafka.quotas.policy.QuotaPolicy;
 import io.strimzi.kafka.quotas.policy.UnlimitedQuotaPolicy;
 import org.apache.kafka.common.config.AbstractConfig;
@@ -52,6 +52,7 @@ public class StaticQuotaConfig extends AbstractConfig {
 
     /**
      * Construct a configuration for the static quota plugin.
+     *
      * @param props the configuration properties
      * @param doLog whether the configurations should be logged
      */
@@ -107,20 +108,17 @@ public class StaticQuotaConfig extends AbstractConfig {
         final Long legacyHardProp = getLong(STORAGE_QUOTA_HARD_PROP);
         final MinFreeBytesQuotaPolicy minFreeBytesQuotaPolicy = new MinFreeBytesQuotaPolicy(softFreeBytes, hardFreeBytes);
         final MinFreePercentageQuotaPolicy minFreePercentageQuotaPolicy = new MinFreePercentageQuotaPolicy(softFreePercent, hardFreePercent);
-        if (isConfigured(softFreeBytes) && isConfigured(hardFreeBytes)) {
-            return minFreeBytesQuotaPolicy;
-        } else if (isConfigured(softFreePercent) && isConfigured(hardFreePercent)) {
-            return minFreePercentageQuotaPolicy;
-        } else if (isConfigured(softFreeBytes) && isConfigured(hardFreePercent)) {
-            return new CompositeFreePolicy(minFreeBytesQuotaPolicy, minFreePercentageQuotaPolicy);
-        } else if (isConfigured(softFreePercent) && isConfigured(hardFreeBytes)) {
-            return new CompositeFreePolicy(minFreePercentageQuotaPolicy, minFreeBytesQuotaPolicy);
-        } else if (isConfigured(legacySoftProp, Long.MAX_VALUE) && isConfigured(legacyHardProp, Long.MAX_VALUE)) {
-            return new ConsumedSpaceQuotaPolicy(legacySoftProp, legacyHardProp);
+
+        if ((isConfigured(softFreeBytes) || isConfigured(hardFreeBytes)) && (isConfigured(softFreePercent) || isConfigured(hardFreePercent))) {
+            //Supports any combination of soft & hard min free requirements
+            return new MostConservativeQuotaPolicy(minFreeBytesQuotaPolicy, minFreePercentageQuotaPolicy);
         } else if (isConfigured(softFreeBytes) || isConfigured(hardFreeBytes)) {
             return minFreeBytesQuotaPolicy;
         } else if (isConfigured(softFreePercent) || isConfigured(hardFreePercent)) {
             return minFreePercentageQuotaPolicy;
+        } else if (isConfigured(legacySoftProp, Long.MAX_VALUE) && isConfigured(legacyHardProp, Long.MAX_VALUE)) {
+            log.warn("Using Deprecated max consumed space quota policy. Min free quota policies are recommended");
+            return new ConsumedSpaceQuotaPolicy(legacySoftProp, legacyHardProp);
         }
         return UnlimitedQuotaPolicy.INSTANCE;
     }
