@@ -112,7 +112,7 @@ public class StorageChecker implements Runnable {
         } catch (IOException e) {
             log.warn("unable to read disk space for " + store.name() + " due to " + e.getMessage(), e);
         }
-        return new VolumeDetails(store.name(), -1L, -1L);
+        return new VolumeDetails(store.name(), UNKNOWN_USAGE_SENTINEL, UNKNOWN_USAGE_SENTINEL);
     }
 
     static <T> T apply(IOSupplier<T> supplier) {
