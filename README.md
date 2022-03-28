@@ -4,11 +4,11 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 [![Twitter Follow](https://img.shields.io/twitter/follow/strimziio.svg?style=social&label=Follow&style=for-the-badge)](https://twitter.com/strimziio)
 
-# Kafka Quota Plugin
+# Quota Plugin for Apache Kafka®
 
 **This project is based on [https://github.com/lulf/kafka-static-quota-plugin](https://github.com/lulf/kafka-static-quota-plugin) and was originally created by [Ulf Lilleengen](https://github.com/lulf).**
 
-This is a broker quota plugin for Apache Kafka to allow setting a per-broker limits statically in the broker configuration. 
+This is a broker quota plugin for [Apache Kafka®](https://kafka.apache.org) to allow setting a per-broker limits statically in the broker configuration. 
 
 The default quota plugin in Apache Kafka will hand out a unique quota per client. 
 This plugin will configure a total quota independent of the number of clients. 
