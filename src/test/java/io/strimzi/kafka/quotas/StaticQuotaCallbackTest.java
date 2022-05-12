@@ -89,6 +89,34 @@ class StaticQuotaCallbackTest {
         verify(mock, times(1)).stop();
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void quotaResetRequiredShouldRespectQuotaType() {
+        StorageChecker mock = mock(StorageChecker.class);
+        ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
+        doNothing().when(mock).configure(anyLong(), anyList(), argument.capture());
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock);
+        quotaCallback.configure(Map.of());
+        Consumer<Long> storageUpdateConsumer = argument.getValue();
+        quotaCallback.updateClusterMetadata(null);
+
+        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
+        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.FETCH), "unexpected initial state");
+
+        assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
+        assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.FETCH), "unexpected state on subsequent call without storage state change");
+
+        //When
+        storageUpdateConsumer.accept(1L);
+
+        //Then
+        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
+        assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.FETCH), "unexpected state on subsequent call after 1st storage state change");
+
+        quotaCallback.close();
+    }
+
+    @SuppressWarnings("unchecked")
     @Test
     void quotaResetRequired() {
         StorageChecker mock = mock(StorageChecker.class);
@@ -111,6 +139,7 @@ class StaticQuotaCallbackTest {
         quotaCallback.close();
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     void storageCheckerMetrics() {
         StorageChecker mock = mock(StorageChecker.class);

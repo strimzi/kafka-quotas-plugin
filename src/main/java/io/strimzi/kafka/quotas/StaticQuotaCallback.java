@@ -6,11 +6,13 @@ package io.strimzi.kafka.quotas;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -40,7 +42,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private volatile long storageQuotaSoft = Long.MAX_VALUE;
     private volatile long storageQuotaHard = Long.MAX_VALUE;
     private volatile List<String> excludedPrincipalNameList = List.of();
-    private final AtomicBoolean resetQuota = new AtomicBoolean(true);
+    private final Set<ClientQuotaType> resetQuota = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final StorageChecker storageChecker;
     private final static long LOGGING_DELAY_MS = 1000;
     private AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
@@ -53,6 +55,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     StaticQuotaCallback(StorageChecker storageChecker) {
         this.storageChecker = storageChecker;
+        Collections.addAll(resetQuota, ClientQuotaType.values());
     }
 
     @Override
@@ -118,7 +121,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     @Override
     public boolean quotaResetRequired(ClientQuotaType quotaType) {
-        return resetQuota.getAndSet(false);
+        return resetQuota.remove(quotaType);
     }
 
     @Override
@@ -183,7 +186,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private void updateUsedStorage(Long newValue) {
         var oldValue = storageUsed.getAndSet(newValue);
         if (oldValue != newValue) {
-            resetQuota.set(true);
+            resetQuota.add(ClientQuotaType.PRODUCE);
         }
     }
 
