@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -49,12 +51,19 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
     private final String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
+    private final ScheduledExecutorService backgroundScheduler;
+
     public StaticQuotaCallback() {
-        this(new StorageChecker());
+        this(new StorageChecker(), Executors.newSingleThreadScheduledExecutor(r -> {
+            final Thread thread = new Thread(r, StaticQuotaCallback.class.getSimpleName() + "-taskExecutor");
+            thread.setDaemon(true);
+            return thread;
+        }));
     }
 
-    StaticQuotaCallback(StorageChecker storageChecker) {
+    StaticQuotaCallback(StorageChecker storageChecker, ScheduledExecutorService backgroundScheduler) {
         this.storageChecker = storageChecker;
+        this.backgroundScheduler = backgroundScheduler;
         Collections.addAll(resetQuota, ClientQuotaType.values());
     }
 
@@ -151,12 +160,15 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         excludedPrincipalNameList = config.getExcludedPrincipalNameList();
 
         long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
-        List<Path> logDirs = config.getLogDirs().stream().map(Paths::get).collect(Collectors.toList());
-        storageChecker.configure(storageCheckIntervalMillis,
-                logDirs,
-                this::updateUsedStorage);
 
-        log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
+        if (storageCheckIntervalMillis > 0L) {
+            List<Path> logDirs = config.getLogDirs().stream().map(Paths::get).collect(Collectors.toList());
+            storageChecker.configure(
+                    logDirs,
+                    this::updateUsedStorage);
+            backgroundScheduler.scheduleAtFixedRate(storageChecker, storageCheckIntervalMillis, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
+            log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
+        }
         if (!excludedPrincipalNameList.isEmpty()) {
             log.info("Excluded principals {}", excludedPrincipalNameList);
         }
