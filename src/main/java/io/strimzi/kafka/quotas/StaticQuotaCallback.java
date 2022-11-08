@@ -135,17 +135,13 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     @Override
     public boolean updateClusterMetadata(Cluster cluster) {
-        storageChecker.startIfNecessary();
         return false;
     }
 
     @Override
     public void close() {
         try {
-            storageChecker.stop();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
+            closeExecutorService();
         } finally {
             Metrics.defaultRegistry().allMetrics().keySet().stream().filter(m -> scope.equals(m.getScope())).forEach(Metrics.defaultRegistry()::removeMetric);
         }
@@ -193,6 +189,14 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             String name = clientQuotaType.name().toUpperCase(ENGLISH).charAt(0) + clientQuotaType.name().toLowerCase(ENGLISH).substring(1);
             Metrics.newGauge(metricName(StaticQuotaCallback.class, name), new ClientQuotaGauge(quota));
         });
+    }
+
+    private void closeExecutorService() {
+        try {
+            backgroundScheduler.shutdownNow();
+        } catch (Exception e) {
+            log.warn("Encountered problem shutting down background executor: {}", e.getMessage(), e);
+        }
     }
 
     private void updateUsedStorage(Long newValue) {
