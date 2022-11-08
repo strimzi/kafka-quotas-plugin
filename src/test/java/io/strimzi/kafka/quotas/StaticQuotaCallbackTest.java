@@ -119,6 +119,20 @@ class StaticQuotaCallbackTest {
     }
 
     @Test
+    void shouldNotScheduleStorageCheckWhenCheckIntervalIsNotProvided() {
+        //Given
+        StorageChecker storageChecker = mock(StorageChecker.class);
+        ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
+        StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
+
+        //When
+        target.configure(Map.of());
+
+        //Then
+        verify(scheduledExecutorService, times(0)).scheduleAtFixedRate(any(), anyLong(), anyLong(), any(TimeUnit.class));
+    }
+
+    @Test
     void shouldShutdownExecutorOnClose() {
         //Given
         StorageChecker storageChecker = mock(StorageChecker.class);
