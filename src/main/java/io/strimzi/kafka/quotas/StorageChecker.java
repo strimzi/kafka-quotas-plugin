@@ -31,14 +31,6 @@ public class StorageChecker implements Runnable {
         this.consumer = consumer;
     }
 
-    void startIfNecessary() {
-
-    }
-
-    void stop() throws InterruptedException {
-
-    }
-
     @Override
     public void run() {
         if (logDirs != null && !logDirs.isEmpty()) {

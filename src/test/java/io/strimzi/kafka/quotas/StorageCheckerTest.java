@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -29,13 +28,6 @@ public class StorageCheckerTest {
     @BeforeEach
     void setup() {
         target = new StorageChecker();
-    }
-
-    @AfterEach
-    void teardown() throws Exception {
-        if (target != null) {
-            target.stop();
-        }
     }
 
     @Test
