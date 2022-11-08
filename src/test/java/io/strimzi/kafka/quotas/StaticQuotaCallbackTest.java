@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.SortedMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,6 +36,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class StaticQuotaCallbackTest {
 
@@ -127,6 +130,26 @@ class StaticQuotaCallbackTest {
 
         //Verify
         verify(scheduledExecutorService, times(1)).shutdownNow();
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @Test
+    void shouldCancelExisting() {
+        //Given
+        StorageChecker storageChecker = mock(StorageChecker.class);
+        ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
+        final ScheduledFuture scheduledFuture = mock(ScheduledFuture.class);
+        when(scheduledExecutorService.scheduleAtFixedRate(any(), anyLong(), anyLong(), any())).thenReturn(scheduledFuture);
+
+        StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
+        target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "1"));
+
+        //When
+        target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "1"));
+
+        //Then
+        verify(scheduledFuture).cancel(anyBoolean());
+
     }
 
     @SuppressWarnings("unchecked")

@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -52,6 +53,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
     private final ScheduledExecutorService backgroundScheduler;
+    private ScheduledFuture<?> storageCheckerFuture;
 
     public StaticQuotaCallback() {
         this(new StorageChecker(), Executors.newSingleThreadScheduledExecutor(r -> {
@@ -156,13 +158,15 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         excludedPrincipalNameList = config.getExcludedPrincipalNameList();
 
         long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
-
+        if (storageCheckerFuture != null) {
+            storageCheckerFuture.cancel(true);
+        }
         if (storageCheckIntervalMillis > 0L) {
             List<Path> logDirs = config.getLogDirs().stream().map(Paths::get).collect(Collectors.toList());
             storageChecker.configure(
                     logDirs,
                     this::updateUsedStorage);
-            backgroundScheduler.scheduleAtFixedRate(storageChecker, storageCheckIntervalMillis, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
+            storageCheckerFuture = backgroundScheduler.scheduleAtFixedRate(storageChecker, storageCheckIntervalMillis, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
             log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
         }
         if (!excludedPrincipalNameList.isEmpty()) {
