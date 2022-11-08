@@ -40,7 +40,8 @@ import static org.mockito.Mockito.when;
 
 class StaticQuotaCallbackTest {
 
-    public static final Map<String, Integer> MINIMUM_VALID_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10);
+    public static final Map<String, Integer> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10);
+
     StaticQuotaCallback target;
 
     ScheduledExecutorService backgroundScheduler = Executors.newSingleThreadScheduledExecutor();
@@ -123,7 +124,7 @@ class StaticQuotaCallbackTest {
         StorageChecker storageChecker = mock(StorageChecker.class);
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
         StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
-        target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "1"));
+        target.configure(MINIMUM_EXECUTABLE_CONFIG);
 
         //When
         target.close();
@@ -142,10 +143,10 @@ class StaticQuotaCallbackTest {
         when(scheduledExecutorService.scheduleAtFixedRate(any(), anyLong(), anyLong(), any())).thenReturn(scheduledFuture);
 
         StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
-        target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "1"));
+        target.configure(MINIMUM_EXECUTABLE_CONFIG);
 
         //When
-        target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "1"));
+        target.configure(MINIMUM_EXECUTABLE_CONFIG);
 
         //Then
         verify(scheduledFuture).cancel(anyBoolean());
@@ -159,7 +160,7 @@ class StaticQuotaCallbackTest {
         ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
         doNothing().when(mock).configure(anyList(), argument.capture());
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock, backgroundScheduler);
-        quotaCallback.configure(MINIMUM_VALID_CONFIG);
+        quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
         Consumer<Long> storageUpdateConsumer = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
 
@@ -186,7 +187,7 @@ class StaticQuotaCallbackTest {
         ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
         doNothing().when(mock).configure(anyList(), argument.capture());
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock, backgroundScheduler);
-        quotaCallback.configure(MINIMUM_VALID_CONFIG);
+        quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
         Consumer<Long> storageUpdateConsumer = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
 
