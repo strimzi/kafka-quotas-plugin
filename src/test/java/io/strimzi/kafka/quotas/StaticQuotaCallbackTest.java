@@ -101,7 +101,7 @@ class StaticQuotaCallbackTest {
         target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "1"));
 
         //Verify
-        verify(scheduledExecutorService, times(1)).scheduleAtFixedRate(any(), eq(1000L), eq(1000L), eq(TimeUnit.MILLISECONDS));
+        verify(scheduledExecutorService, times(1)).scheduleWithFixedDelay(any(), eq(1000L), eq(1000L), eq(TimeUnit.MILLISECONDS));
     }
 
     @Test
@@ -115,7 +115,7 @@ class StaticQuotaCallbackTest {
         target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "0"));
 
         //Then
-        verify(scheduledExecutorService, times(0)).scheduleAtFixedRate(any(), anyLong(), anyLong(), any(TimeUnit.class));
+        verify(scheduledExecutorService, times(0)).scheduleWithFixedDelay(any(), anyLong(), anyLong(), any(TimeUnit.class));
     }
 
     @Test
@@ -129,7 +129,7 @@ class StaticQuotaCallbackTest {
         target.configure(Map.of());
 
         //Then
-        verify(scheduledExecutorService, times(0)).scheduleAtFixedRate(any(), anyLong(), anyLong(), any(TimeUnit.class));
+        verify(scheduledExecutorService, times(0)).scheduleWithFixedDelay(any(), anyLong(), anyLong(), any(TimeUnit.class));
     }
 
     @Test

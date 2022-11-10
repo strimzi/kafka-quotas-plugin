@@ -63,7 +63,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }));
     }
 
-    StaticQuotaCallback(StorageChecker storageChecker, ScheduledExecutorService backgroundScheduler) {
+    /*test*/ StaticQuotaCallback(StorageChecker storageChecker, ScheduledExecutorService backgroundScheduler) {
         this.storageChecker = storageChecker;
         this.backgroundScheduler = backgroundScheduler;
         Collections.addAll(resetQuota, ClientQuotaType.values());
@@ -166,7 +166,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             storageChecker.configure(
                     logDirs,
                     this::updateUsedStorage);
-            storageCheckerFuture = backgroundScheduler.scheduleAtFixedRate(storageChecker, storageCheckIntervalMillis, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
+            backgroundScheduler.scheduleWithFixedDelay(storageChecker, storageCheckIntervalMillis, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
             log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
         }
         if (!excludedPrincipalNameList.isEmpty()) {
