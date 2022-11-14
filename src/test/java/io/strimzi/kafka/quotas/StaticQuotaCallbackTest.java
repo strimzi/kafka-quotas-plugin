@@ -4,19 +4,12 @@
  */
 package io.strimzi.kafka.quotas;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import com.yammer.metrics.Metrics;
@@ -30,9 +23,25 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
 class StaticQuotaCallbackTest {
 
+    public static final Map<String, Integer> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10);
+
     StaticQuotaCallback target;
+
+    ScheduledExecutorService backgroundScheduler = Executors.newSingleThreadScheduledExecutor();
 
     @BeforeEach
     void setup() {
@@ -79,14 +88,60 @@ class StaticQuotaCallbackTest {
     }
 
     @Test
-    void pluginLifecycle() throws Exception {
-        StorageChecker mock = mock(StorageChecker.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(mock);
+    void shouldScheduleStorageChecker() {
+        //Given
+        StorageChecker storageChecker = mock(StorageChecker.class);
+        ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
+        StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
+
+        //When
+        target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "1"));
+
+        //Verify
+        verify(scheduledExecutorService, times(1)).scheduleWithFixedDelay(any(), eq(1000L), eq(1000L), eq(TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    void shouldNotScheduleStorageCheckWhenCheckIntervalIsZero() {
+        //Given
+        StorageChecker storageChecker = mock(StorageChecker.class);
+        ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
+        StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
+
+        //When
+        target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "0"));
+
+        //Then
+        verify(scheduledExecutorService, times(0)).scheduleWithFixedDelay(any(), anyLong(), anyLong(), any(TimeUnit.class));
+    }
+
+    @Test
+    void shouldNotScheduleStorageCheckWhenCheckIntervalIsNotProvided() {
+        //Given
+        StorageChecker storageChecker = mock(StorageChecker.class);
+        ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
+        StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
+
+        //When
         target.configure(Map.of());
-        target.updateClusterMetadata(null);
-        verify(mock, times(1)).startIfNecessary();
+
+        //Then
+        verify(scheduledExecutorService, times(0)).scheduleWithFixedDelay(any(), anyLong(), anyLong(), any(TimeUnit.class));
+    }
+
+    @Test
+    void shouldShutdownExecutorOnClose() {
+        //Given
+        StorageChecker storageChecker = mock(StorageChecker.class);
+        ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
+        StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
+        target.configure(MINIMUM_EXECUTABLE_CONFIG);
+
+        //When
         target.close();
-        verify(mock, times(1)).stop();
+
+        //Verify
+        verify(scheduledExecutorService, times(1)).shutdownNow();
     }
 
     @SuppressWarnings("unchecked")
@@ -94,9 +149,9 @@ class StaticQuotaCallbackTest {
     void quotaResetRequiredShouldRespectQuotaType() {
         StorageChecker mock = mock(StorageChecker.class);
         ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
-        doNothing().when(mock).configure(anyLong(), anyList(), argument.capture());
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock);
-        quotaCallback.configure(Map.of());
+        doNothing().when(mock).configure(anyList(), argument.capture());
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock, backgroundScheduler);
+        quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
         Consumer<Long> storageUpdateConsumer = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
 
@@ -121,9 +176,9 @@ class StaticQuotaCallbackTest {
     void quotaResetRequired() {
         StorageChecker mock = mock(StorageChecker.class);
         ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
-        doNothing().when(mock).configure(anyLong(), anyList(), argument.capture());
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock);
-        quotaCallback.configure(Map.of());
+        doNothing().when(mock).configure(anyList(), argument.capture());
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock, backgroundScheduler);
+        quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
         Consumer<Long> storageUpdateConsumer = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
 
@@ -144,13 +199,14 @@ class StaticQuotaCallbackTest {
     void storageCheckerMetrics() {
         StorageChecker mock = mock(StorageChecker.class);
         ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
-        doNothing().when(mock).configure(anyLong(), anyList(), argument.capture());
+        doNothing().when(mock).configure(anyList(), argument.capture());
 
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock);
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock, backgroundScheduler);
 
         quotaCallback.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 15L,
-                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 16L
+                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 16L,
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10
         ));
 
         argument.getValue().accept(17L);

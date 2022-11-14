@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -31,16 +30,9 @@ public class StorageCheckerTest {
         target = new StorageChecker();
     }
 
-    @AfterEach
-    void teardown() throws Exception {
-        if (target != null) {
-            target.stop();
-        }
-    }
-
     @Test
     void storageCheckCheckDiskUsageZeroWhenMissing() throws Exception {
-        target.configure(0, List.of(tempDir), storage -> { });
+        target.configure(List.of(tempDir), storage -> { });
         Files.delete(tempDir);
         assertEquals(0, target.checkDiskUsage());
     }
@@ -48,7 +40,7 @@ public class StorageCheckerTest {
     @Test
     void storageCheckCheckDiskUsageAtLeastFileSize() throws Exception {
         Path tempFile = Files.createTempFile(tempDir, "t", ".tmp");
-        target.configure(0, List.of(tempDir), storage -> { });
+        target.configure(List.of(tempDir), storage -> { });
 
         Files.writeString(tempFile, "0123456789");
         long minSize = Files.size(tempFile);
@@ -57,7 +49,7 @@ public class StorageCheckerTest {
 
     @Test
     void storageCheckCheckDiskUsageNotDoubled(@TempDir Path tempDir1, @TempDir Path tempDir2) throws Exception {
-        target.configure(0, List.of(tempDir1, tempDir2), storage -> { });
+        target.configure(List.of(tempDir1, tempDir2), storage -> { });
 
         FileStore store = Files.getFileStore(tempDir1);
         assertEquals(store.getTotalSpace() - store.getUsableSpace(), target.checkDiskUsage());
@@ -70,8 +62,8 @@ public class StorageCheckerTest {
         long minSize = Files.size(tempFile);
 
         CompletableFuture<Long> completableFuture = new CompletableFuture<>();
-        target.configure(25, List.of(tempDir), completableFuture::complete);
-        target.startIfNecessary();
+        target.configure(List.of(tempDir), completableFuture::complete);
+        target.run();
 
         Long storage = completableFuture.get(1, TimeUnit.SECONDS);
         assertTrue(storage >= minSize);
