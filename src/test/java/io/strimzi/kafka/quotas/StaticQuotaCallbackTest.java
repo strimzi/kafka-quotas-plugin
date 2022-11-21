@@ -4,6 +4,8 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
@@ -38,6 +40,10 @@ import static org.mockito.Mockito.verify;
 class StaticQuotaCallbackTest {
 
     public static final Map<String, Integer> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10);
+
+    private static Volume newVolume(int consumedSpace) {
+        return new Volume("-1", "test", 50, consumedSpace);
+    }
 
     StaticQuotaCallback target;
 
@@ -90,9 +96,9 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldScheduleStorageChecker() {
         //Given
-        StorageChecker storageChecker = mock(StorageChecker.class);
+        StorageChecker localVolumeSource = mock(StorageChecker.class);
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(localVolumeSource, scheduledExecutorService);
 
         //When
         target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "1"));
@@ -104,9 +110,9 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldNotScheduleStorageCheckWhenCheckIntervalIsZero() {
         //Given
-        StorageChecker storageChecker = mock(StorageChecker.class);
+        StorageChecker localVolumeSource = mock(StorageChecker.class);
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(localVolumeSource, scheduledExecutorService);
 
         //When
         target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "0"));
@@ -118,9 +124,9 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldNotScheduleStorageCheckWhenCheckIntervalIsNotProvided() {
         //Given
-        StorageChecker storageChecker = mock(StorageChecker.class);
+        StorageChecker localVolumeSource = mock(StorageChecker.class);
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(localVolumeSource, scheduledExecutorService);
 
         //When
         target.configure(Map.of());
@@ -132,9 +138,9 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldShutdownExecutorOnClose() {
         //Given
-        StorageChecker storageChecker = mock(StorageChecker.class);
+        StorageChecker localVolumeSource = mock(StorageChecker.class);
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(storageChecker, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(localVolumeSource, scheduledExecutorService);
         target.configure(MINIMUM_EXECUTABLE_CONFIG);
 
         //When
@@ -148,11 +154,11 @@ class StaticQuotaCallbackTest {
     @Test
     void quotaResetRequiredShouldRespectQuotaType() {
         StorageChecker mock = mock(StorageChecker.class);
-        ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
+        ArgumentCaptor<Consumer<Collection<Volume>>> argument = ArgumentCaptor.forClass(Consumer.class);
         doNothing().when(mock).configure(anyList(), argument.capture());
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock, backgroundScheduler);
         quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
-        Consumer<Long> storageUpdateConsumer = argument.getValue();
+        Consumer<Collection<Volume>> storageUpdateConsumer = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
 
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
@@ -162,7 +168,7 @@ class StaticQuotaCallbackTest {
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.FETCH), "unexpected state on subsequent call without storage state change");
 
         //When
-        storageUpdateConsumer.accept(1L);
+        storageUpdateConsumer.accept(List.of(newVolume(10)));
 
         //Then
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
@@ -175,20 +181,20 @@ class StaticQuotaCallbackTest {
     @Test
     void quotaResetRequired() {
         StorageChecker mock = mock(StorageChecker.class);
-        ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
+        ArgumentCaptor<Consumer<Collection<Volume>>> argument = ArgumentCaptor.forClass(Consumer.class);
         doNothing().when(mock).configure(anyList(), argument.capture());
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock, backgroundScheduler);
         quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
-        Consumer<Long> storageUpdateConsumer = argument.getValue();
+        Consumer<Collection<Volume>> storageUpdateConsumer = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
 
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        storageUpdateConsumer.accept(1L);
+        storageUpdateConsumer.accept(List.of(newVolume(1)));
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
-        storageUpdateConsumer.accept(1L);
+        storageUpdateConsumer.accept(List.of(newVolume(1)));
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        storageUpdateConsumer.accept(2L);
+        storageUpdateConsumer.accept(List.of(newVolume(2)));
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 2nd storage state change");
 
         quotaCallback.close();
@@ -198,7 +204,7 @@ class StaticQuotaCallbackTest {
     @Test
     void storageCheckerMetrics() {
         StorageChecker mock = mock(StorageChecker.class);
-        ArgumentCaptor<Consumer<Long>> argument = ArgumentCaptor.forClass(Consumer.class);
+        ArgumentCaptor<Consumer<Collection<Volume>>> argument = ArgumentCaptor.forClass(Consumer.class);
         doNothing().when(mock).configure(anyList(), argument.capture());
 
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock, backgroundScheduler);
@@ -209,7 +215,7 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10
         ));
 
-        argument.getValue().accept(17L);
+        argument.getValue().accept(List.of(newVolume(17)));
 
         SortedMap<MetricName, Metric> group = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "StorageChecker");
 

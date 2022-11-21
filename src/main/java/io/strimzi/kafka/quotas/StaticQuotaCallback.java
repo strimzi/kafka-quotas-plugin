@@ -6,6 +6,7 @@ package io.strimzi.kafka.quotas;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -45,7 +46,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private volatile long storageQuotaHard = Long.MAX_VALUE;
     private volatile List<String> excludedPrincipalNameList = List.of();
     private final Set<ClientQuotaType> resetQuota = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private final StorageChecker storageChecker;
+    private final StorageChecker localVolumeSource;
     private final static long LOGGING_DELAY_MS = 1000;
     private AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
     private AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
@@ -61,8 +62,8 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }));
     }
 
-    /*test*/ StaticQuotaCallback(StorageChecker storageChecker, ScheduledExecutorService backgroundScheduler) {
-        this.storageChecker = storageChecker;
+    /*test*/ StaticQuotaCallback(StorageChecker localVolumeSource, ScheduledExecutorService backgroundScheduler) {
+        this.localVolumeSource = localVolumeSource;
         this.backgroundScheduler = backgroundScheduler;
         Collections.addAll(resetQuota, ClientQuotaType.values());
     }
@@ -159,10 +160,10 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
         if (storageCheckIntervalMillis > 0L) {
             List<Path> logDirs = config.getLogDirs().stream().map(Paths::get).collect(Collectors.toList());
-            storageChecker.configure(
+            localVolumeSource.configure(
                     logDirs,
-                    this::updateUsedStorage);
-            backgroundScheduler.scheduleWithFixedDelay(storageChecker, storageCheckIntervalMillis, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
+                    this::updateVolumes);
+            backgroundScheduler.scheduleWithFixedDelay(localVolumeSource, storageCheckIntervalMillis, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
             log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
         }
         if (!excludedPrincipalNameList.isEmpty()) {
@@ -198,6 +199,12 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             log.warn("Encountered problem shutting down background executor: {}", e.getMessage(), e);
         }
     }
+
+    private void updateVolumes(Collection<Volume> volumes) {
+        final long totalConsumedSpace = volumes.stream().mapToLong(Volume::getConsumedSpace).sum();
+        updateUsedStorage(totalConsumedSpace);
+    }
+
 
     private void updateUsedStorage(Long newValue) {
         var oldValue = storageUsed.getAndSet(newValue);
