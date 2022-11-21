@@ -45,7 +45,7 @@ class StaticQuotaCallbackTest {
     public static final Map<String, Integer> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10);
 
     private static Volume newVolume(int consumedSpace) {
-        return new Volume("-1", "test", 50, consumedSpace);
+        return new Volume("-1", "test", 50, 50 - consumedSpace);
     }
 
     StaticQuotaCallback target;
