@@ -202,13 +202,9 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     private void updateVolumes(Collection<Volume> volumes) {
         final long totalConsumedSpace = volumes.stream().mapToLong(Volume::getConsumedSpace).sum();
-        updateUsedStorage(totalConsumedSpace);
-    }
-
-
-    private void updateUsedStorage(Long newValue) {
-        var oldValue = storageUsed.getAndSet(newValue);
-        if (oldValue != newValue) {
+        var oldValue = storageUsed.getAndSet(totalConsumedSpace);
+        log.debug("Storage usage checked: {}", totalConsumedSpace);
+        if (oldValue != totalConsumedSpace) {
             resetQuota.add(ClientQuotaType.PRODUCE);
         }
     }

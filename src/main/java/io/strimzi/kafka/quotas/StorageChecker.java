@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -22,8 +21,6 @@ import org.slf4j.LoggerFactory;
  */
 public class StorageChecker implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(StorageChecker.class);
-
-    private final AtomicLong storageUsed = new AtomicLong(0);
 
     private volatile List<Path> logDirs;
     private volatile Consumer<Collection<Volume>> consumer;
@@ -39,13 +36,7 @@ public class StorageChecker implements Runnable {
             try {
                 log.info("Quota Storage Checker is now starting");
                 try {
-                    Collection<Volume> diskUsage = checkDiskUsage();
-                    final long totalUsed = diskUsage.stream().mapToLong(Volume::getConsumedSpace).sum();
-                    long previousUsage = storageUsed.getAndSet(totalUsed);
-                    if (totalUsed != previousUsage) {
-                        consumer.accept(diskUsage);
-                    }
-                    log.debug("Storage usage checked: {}", storageUsed.get());
+                    consumer.accept(checkDiskUsage());
                 } catch (Exception e) {
                     log.warn("Exception in storage checker thread", e);
                 }
