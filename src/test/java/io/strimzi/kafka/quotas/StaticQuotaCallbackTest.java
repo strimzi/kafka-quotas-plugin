@@ -87,7 +87,7 @@ class StaticQuotaCallbackTest {
     void excludedPrincipal() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
         target.configure(Map.of(StaticQuotaConfig.EXCLUDED_PRINCIPAL_NAME_LIST_PROP, "foo,bar",
-                                StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024));
+                StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024));
         double fooQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(Double.MAX_VALUE, fooQuotaLimit);
 
