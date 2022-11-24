@@ -25,24 +25,27 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class StaticQuotaCallbackTest {
 
     public static final Map<String, Integer> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10);
+
+    @Mock(lenient = true)
+    VolumeSourceBuilder volumeSourceBuilder;
 
     private static Volume newVolume(int consumedSpace) {
         return new Volume("-1", "test", 50, 50 - consumedSpace);
@@ -55,6 +58,10 @@ class StaticQuotaCallbackTest {
     @BeforeEach
     void setup() {
         target = new StaticQuotaCallback();
+        when(volumeSourceBuilder.withConfig(any())).thenReturn(volumeSourceBuilder);
+        when(volumeSourceBuilder.withVolumeConsumer(any())).thenReturn(volumeSourceBuilder);
+        when(volumeSourceBuilder.build()).thenReturn(() -> {
+        });
     }
 
     @AfterEach
@@ -99,9 +106,8 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldScheduleStorageChecker() {
         //Given
-        StorageChecker localVolumeSource = mock(StorageChecker.class);
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(localVolumeSource, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
 
         //When
         target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "1"));
@@ -113,9 +119,8 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldNotScheduleStorageCheckWhenCheckIntervalIsZero() {
         //Given
-        StorageChecker localVolumeSource = mock(StorageChecker.class);
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(localVolumeSource, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
 
         //When
         target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "0"));
@@ -127,9 +132,8 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldNotScheduleStorageCheckWhenCheckIntervalIsNotProvided() {
         //Given
-        StorageChecker localVolumeSource = mock(StorageChecker.class);
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(localVolumeSource, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(StaticQuotaCallbackTest.this.volumeSourceBuilder, scheduledExecutorService);
 
         //When
         target.configure(Map.of());
@@ -141,9 +145,8 @@ class StaticQuotaCallbackTest {
     @Test
     void shouldShutdownExecutorOnClose() {
         //Given
-        StorageChecker localVolumeSource = mock(StorageChecker.class);
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(localVolumeSource, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(StaticQuotaCallbackTest.this.volumeSourceBuilder, scheduledExecutorService);
         target.configure(MINIMUM_EXECUTABLE_CONFIG);
 
         //When
@@ -156,10 +159,9 @@ class StaticQuotaCallbackTest {
     @SuppressWarnings("unchecked")
     @Test
     void quotaResetRequiredShouldRespectQuotaType() {
-        StorageChecker mock = mock(StorageChecker.class);
         ArgumentCaptor<Consumer<Collection<Volume>>> argument = ArgumentCaptor.forClass(Consumer.class);
-        doNothing().when(mock).configure(anyList(), argument.capture());
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock, backgroundScheduler);
+        when(volumeSourceBuilder.withVolumeConsumer(argument.capture())).thenReturn(volumeSourceBuilder);
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
         quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
         Consumer<Collection<Volume>> storageUpdateConsumer = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
@@ -183,10 +185,9 @@ class StaticQuotaCallbackTest {
     @SuppressWarnings("unchecked")
     @Test
     void quotaResetRequired() {
-        StorageChecker mock = mock(StorageChecker.class);
         ArgumentCaptor<Consumer<Collection<Volume>>> argument = ArgumentCaptor.forClass(Consumer.class);
-        doNothing().when(mock).configure(anyList(), argument.capture());
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock, backgroundScheduler);
+        when(volumeSourceBuilder.withVolumeConsumer(argument.capture())).thenReturn(volumeSourceBuilder);
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
         quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
         Consumer<Collection<Volume>> storageUpdateConsumer = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
@@ -206,11 +207,10 @@ class StaticQuotaCallbackTest {
     @SuppressWarnings("unchecked")
     @Test
     void storageCheckerMetrics() {
-        StorageChecker mock = mock(StorageChecker.class);
         ArgumentCaptor<Consumer<Collection<Volume>>> argument = ArgumentCaptor.forClass(Consumer.class);
-        doNothing().when(mock).configure(anyList(), argument.capture());
+        when(volumeSourceBuilder.withVolumeConsumer(argument.capture())).thenReturn(volumeSourceBuilder);
 
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(mock, backgroundScheduler);
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
 
         quotaCallback.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 15L,
