@@ -24,11 +24,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,10 +47,10 @@ class ClusterVolumeSourceTest {
     void setUp() {
         volumeConsumer = new VolumeConsumer();
         clusterVolumeSource = new ClusterVolumeSource(admin, volumeConsumer);
-        final DescribeClusterResult mockDescribeClusterResult = Mockito.mock(DescribeClusterResult.class);
+        final DescribeClusterResult mockDescribeClusterResult = mock(DescribeClusterResult.class);
         when(mockDescribeClusterResult.nodes()).thenReturn(KafkaFuture.completedFuture(nodes));
         when(admin.describeCluster()).thenReturn(mockDescribeClusterResult);
-        DescribeLogDirsResult mockDescribeLogDirsResult = Mockito.mock(DescribeLogDirsResult.class);
+        DescribeLogDirsResult mockDescribeLogDirsResult = mock(DescribeLogDirsResult.class);
         when(mockDescribeLogDirsResult.allDescriptions()).thenReturn(KafkaFuture.completedFuture(descriptions));
         when(admin.describeLogDirs(argThat(integers ->
                 integers.equals(nodes.stream().map(Node::id).collect(Collectors.toSet())))))

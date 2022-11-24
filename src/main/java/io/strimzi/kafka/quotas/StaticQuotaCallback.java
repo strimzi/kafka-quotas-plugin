@@ -4,8 +4,6 @@
  */
 package io.strimzi.kafka.quotas;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -17,7 +15,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Gauge;
@@ -46,7 +43,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private volatile long storageQuotaHard = Long.MAX_VALUE;
     private volatile List<String> excludedPrincipalNameList = List.of();
     private final Set<ClientQuotaType> resetQuota = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private final StorageChecker localVolumeSource;
+    private final VolumeSourceBuilder volumeSourceBuilder;
     private final static long LOGGING_DELAY_MS = 1000;
     private AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
     private AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
@@ -55,15 +52,15 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final ScheduledExecutorService backgroundScheduler;
 
     public StaticQuotaCallback() {
-        this(new StorageChecker(), Executors.newSingleThreadScheduledExecutor(r -> {
+        this(new VolumeSourceBuilder(), Executors.newSingleThreadScheduledExecutor(r -> {
             final Thread thread = new Thread(r, StaticQuotaCallback.class.getSimpleName() + "-taskExecutor");
             thread.setDaemon(true);
             return thread;
         }));
     }
 
-    /*test*/ StaticQuotaCallback(StorageChecker localVolumeSource, ScheduledExecutorService backgroundScheduler) {
-        this.localVolumeSource = localVolumeSource;
+    /*test*/ StaticQuotaCallback(VolumeSourceBuilder localVolumeSource, ScheduledExecutorService backgroundScheduler) {
+        this.volumeSourceBuilder = localVolumeSource;
         this.backgroundScheduler = backgroundScheduler;
         Collections.addAll(resetQuota, ClientQuotaType.values());
     }
@@ -143,6 +140,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     public void close() {
         try {
             closeExecutorService();
+            volumeSourceBuilder.close();
         } finally {
             Metrics.defaultRegistry().allMetrics().keySet().stream().filter(m -> scope.equals(m.getScope())).forEach(Metrics.defaultRegistry()::removeMetric);
         }
@@ -159,11 +157,8 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
 
         if (storageCheckIntervalMillis > 0L) {
-            List<Path> logDirs = config.getLogDirs().stream().map(Paths::get).collect(Collectors.toList());
-            localVolumeSource.configure(
-                    logDirs,
-                    this::updateVolumes);
-            backgroundScheduler.scheduleWithFixedDelay(localVolumeSource, storageCheckIntervalMillis, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
+            Runnable job = volumeSourceBuilder.withConfig(config).withVolumeConsumer(this::updateVolumes).build();
+            backgroundScheduler.scheduleWithFixedDelay(job, storageCheckIntervalMillis, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
             log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
         }
         if (!excludedPrincipalNameList.isEmpty()) {
