@@ -53,6 +53,9 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     private final ScheduledExecutorService backgroundScheduler;
 
+    /**
+     * Constructs the Static Quota Callback class
+     */
     public StaticQuotaCallback() {
         this(new StorageChecker(), Executors.newSingleThreadScheduledExecutor(r -> {
             final Thread thread = new Thread(r, StaticQuotaCallback.class.getSimpleName() + "-taskExecutor");
