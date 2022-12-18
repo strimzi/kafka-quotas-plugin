@@ -9,32 +9,38 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.LogDirDescription;
 
 public class VolumeSourceBuilder implements AutoCloseable {
 
     private final Supplier<Boolean> kip827Available;
-    private AdminClient adminClient;
+    private final Function<StaticQuotaConfig.KafkaClientConfig, Admin> adminClientFactory;
+    private Admin adminClient;
     private StaticQuotaConfig config;
     private Consumer<Collection<Volume>> volumesConsumer;
 
     public VolumeSourceBuilder() {
-        this(() -> {
-            try {
-                LogDirDescription.class.getDeclaredMethod("totalBytes");
-                return true;
-            } catch (NoSuchMethodException e) {
-                return false;
-            }
-        });
+        this(VolumeSourceBuilder::testForKip827, kafkaClientConfig -> AdminClient.create(kafkaClientConfig.getKafkaClientConfig()));
     }
 
-    /* test */ VolumeSourceBuilder(Supplier<Boolean> kip827Available) {
+    /* test */ VolumeSourceBuilder(Supplier<Boolean> kip827Available, Function<StaticQuotaConfig.KafkaClientConfig, Admin> adminClientFactory) {
         this.kip827Available = kip827Available;
+        this.adminClientFactory = adminClientFactory;
+    }
+
+     /*test*/ static Boolean testForKip827() {
+        try {
+            LogDirDescription.class.getDeclaredMethod("totalBytes");
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
     }
 
     public VolumeSourceBuilder withConfig(StaticQuotaConfig config) {
@@ -53,8 +59,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
                 if (!kip827Available.get()) {
                     throw new IllegalStateException("Cluster volume source selected but KIP-827 not available");
                 }
-                final StaticQuotaConfig.KafkaClientConfig kafkaClientConfig = config.getKafkaClientConfig();
-                adminClient = AdminClient.create(kafkaClientConfig.getKafkaClientConfig());
+                adminClient = adminClientFactory.apply(config.getKafkaClientConfig());
                 return new ClusterVolumeSource(adminClient, volumesConsumer);
             case LOCAL: //make it explicit
             default:
