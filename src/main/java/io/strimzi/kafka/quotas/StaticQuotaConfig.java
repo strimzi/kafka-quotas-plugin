@@ -4,21 +4,16 @@
  */
 package io.strimzi.kafka.quotas;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.UUID;
 
-import org.apache.kafka.clients.CommonClientConfigs;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
-import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.server.quota.ClientQuotaType;
 import org.slf4j.Logger;
@@ -55,6 +50,7 @@ public class StaticQuotaConfig extends AbstractConfig {
 
     /**
      * Construct a configuration for the static quota plugin.
+     *
      * @param props the configuration properties
      * @param doLog whether the configurations should be logged
      */
@@ -120,59 +116,27 @@ public class StaticQuotaConfig extends AbstractConfig {
     }
 
     static class KafkaClientConfig extends AbstractConfig {
-        public static final String LISTENER_NAME_PROP = "client.quota.callback.kafka.listener.name";
-        public static final String LISTENER_PORT_PROP = "client.quota.callback.kafka.listener.port";
-        public static final String LISTENER_PROTOCOL_PROP = "client.quota.callback.kafka.listener.protocol";
         public static final String CLIENT_ID_PREFIX_PROP = "client.quota.callback.kafka.clientIdPrefix";
+        public static final String ADMIN_CONFIG_PREFIX = "client.quota.callback.kafka.admin.";
         private final Logger log = getLogger(KafkaClientConfig.class);
 
         public KafkaClientConfig(Map<String, ?> props, boolean doLog) {
             super(new ConfigDef()
-                            .define(LISTENER_NAME_PROP, STRING, "replication-9091", LOW, "which listener to connect to")
-                            .define(LISTENER_PORT_PROP, INT, 9091, LOW, "which port to connect to the listener on")
-                            .define(LISTENER_PROTOCOL_PROP, STRING, "SSL", LOW, "what protocol to use when connecting to the listener")
                             .define(CLIENT_ID_PREFIX_PROP, STRING, "__strimzi", LOW, "Prefix to use when creating client.ids"),
                     props,
                     doLog);
         }
 
         public Map<String, Object> getKafkaClientConfig() {
-            final String bootstrapAddress = getBootstrapAddress();
-
-            final Map<String, Object> configuredProperties = Stream.concat(
-                            Stream.of(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG,
-                                            SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG,
-                                            SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG,
-                                            SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG)
-                                    .map(p -> {
-                                        String configKey = String.format("listener.name.%s.%s", getString(LISTENER_NAME_PROP), p);
-                                        String v = getOriginalConfigString(configKey);
-                                        return Map.entry(p, Objects.requireNonNullElse(v, ""));
-                                    })
-                                    .filter(e -> !e.getValue().trim().isEmpty()),
-                            Stream.of(Map.entry(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, bootstrapAddress),
-                                    Map.entry(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, getString(LISTENER_PROTOCOL_PROP))))
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            Map<String, Object> configuredProperties = originalsWithPrefix(ADMIN_CONFIG_PREFIX, true);
+            configuredProperties.computeIfAbsent(AdminClientConfig.CLIENT_ID_CONFIG, this::generateClientId);
             log.info("resolved kafka config of {}", configuredProperties);
             return configuredProperties;
         }
 
-        private String getBootstrapAddress() {
-            final Integer listenerPort = getInt(LISTENER_PORT_PROP);
-            String hostname;
-            try {
-                hostname = InetAddress.getLocalHost().getCanonicalHostName();
-            } catch (UnknownHostException e) {
-                log.warn("Unable to get canonical hostname for localhost: {} defaulting to 127.0.0.1:{}", e.getMessage(), listenerPort, e);
-                hostname = "127.0.0.1";
-            }
-            return String.format("%s:%s", hostname, listenerPort);
+        private Object generateClientId(String key) {
+            return get(CLIENT_ID_PREFIX_PROP) + "-" + originals().get("broker.id") + "-" + UUID.randomUUID();
         }
-
-        private String getOriginalConfigString(String configKey) {
-            return (String) originals().get(configKey);
-        }
-
     }
 
 }
