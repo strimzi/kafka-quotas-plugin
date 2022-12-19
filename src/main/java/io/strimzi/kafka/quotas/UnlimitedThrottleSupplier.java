@@ -5,6 +5,8 @@
 
 package io.strimzi.kafka.quotas;
 
+import java.util.Collection;
+
 public class UnlimitedThrottleSupplier implements ThrottleFactorSupplier {
 
     public static final UnlimitedThrottleSupplier UNLIMITED_QUOTA_SUPPLIER = new UnlimitedThrottleSupplier();
@@ -19,5 +21,10 @@ public class UnlimitedThrottleSupplier implements ThrottleFactorSupplier {
     @Override
     public void addUpdateListener(Runnable listener) {
         listener.run(); //Run it once to trigger it, but otherwise it will never change.
+    }
+
+    @Override
+    public void accept(Collection<Volume> volumes) {
+        //Shrug. Update all you like I won't change my mind
     }
 }

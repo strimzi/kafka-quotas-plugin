@@ -4,7 +4,6 @@
  */
 package io.strimzi.kafka.quotas;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -14,7 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Gauge;
@@ -38,7 +36,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private static final String EXCLUDED_PRINCIPAL_QUOTA_KEY = "excluded-principal-quota-key";
 
     private volatile Map<ClientQuotaType, Quota> quotaMap = new HashMap<>();
-    private final AtomicLong storageUsed = new AtomicLong(0);
     private volatile long storageQuotaSoft = Long.MAX_VALUE;
     private volatile long storageQuotaHard = Long.MAX_VALUE;
     private volatile List<String> excludedPrincipalNameList = List.of();
@@ -130,6 +127,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         storageQuotaSoft = config.getSoftStorageQuota();
         storageQuotaHard = config.getHardStorageQuota();
         throttleFactorSupplier = new TotalConsumedThrottleFactorSupplier(storageQuotaHard, storageQuotaSoft);
+        throttleFactorSupplier.addUpdateListener(() -> resetQuota.add(ClientQuotaType.PRODUCE));
         excludedPrincipalNameList = config.getExcludedPrincipalNameList();
 
         long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
@@ -170,15 +168,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             backgroundScheduler.shutdownNow();
         } catch (Exception e) {
             log.warn("Encountered problem shutting down background executor: {}", e.getMessage(), e);
-        }
-    }
-
-    private void updateVolumes(Collection<Volume> volumes) {
-        final long totalConsumedSpace = volumes.stream().mapToLong(Volume::getConsumedSpace).sum();
-        var oldValue = storageUsed.getAndSet(totalConsumedSpace);
-        log.debug("Storage usage checked: {}", totalConsumedSpace);
-        if (oldValue != totalConsumedSpace) {
-            resetQuota.add(ClientQuotaType.PRODUCE);
         }
     }
 
