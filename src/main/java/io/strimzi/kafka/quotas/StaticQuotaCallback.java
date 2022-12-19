@@ -43,10 +43,8 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private volatile long storageQuotaHard = Long.MAX_VALUE;
     private volatile List<String> excludedPrincipalNameList = List.of();
     private final Set<ClientQuotaType> resetQuota = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private volatile ThrottleFactorSupplier throttleFactorSupplier = UnlimitedThrottleSupplier.UNLIMITED_QUOTA_SUPPLIER;
     private final VolumeSourceBuilder volumeSourceBuilder;
-    private final static long LOGGING_DELAY_MS = 1000;
-    private AtomicLong lastLoggedMessageSoftTimeMs = new AtomicLong(0);
-    private AtomicLong lastLoggedMessageHardTimeMs = new AtomicLong(0);
     private final String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
     private final ScheduledExecutorService backgroundScheduler;
@@ -85,37 +83,12 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
 
         // Don't allow producing messages if we're beyond the storage limit.
-        long currentStorageUsage = storageUsed.get();
-        if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage > storageQuotaSoft && currentStorageUsage < storageQuotaHard) {
-            double minThrottle = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
-            double limit = minThrottle * (1.0 - (1.0 * (currentStorageUsage - storageQuotaSoft) / (storageQuotaHard - storageQuotaSoft)));
-            maybeLog(lastLoggedMessageSoftTimeMs, "Throttling producer rate because disk is beyond soft limit. Used: {}. Quota: {}", storageUsed, limit);
-            return limit;
-        } else if (ClientQuotaType.PRODUCE.equals(quotaType) && currentStorageUsage >= storageQuotaHard) {
-            maybeLog(lastLoggedMessageHardTimeMs, "Limiting producer rate because disk is full. Used: {}. Limit: {}", storageUsed, storageQuotaHard);
-            return 1.0;
-        }
-        return quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
-    }
+        double quota = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
 
-    /**
-     * Put a small delay between logging
-     */
-    private void maybeLog(AtomicLong lastLoggedMessageTimeMs, String format, Object... args) {
-        if (log.isDebugEnabled()) {
-            long now = System.currentTimeMillis();
-            final boolean[] shouldLog = {true};
-            lastLoggedMessageTimeMs.getAndUpdate(current -> {
-                if (now - current >= LOGGING_DELAY_MS) {
-                    shouldLog[0] = true;
-                    return now;
-                }
-                shouldLog[0] = false;
-                return current;
-            });
-            if (shouldLog[0]) {
-                log.debug(format, args);
-            }
+        if (ClientQuotaType.PRODUCE.equals(quotaType)) {
+            return quota * throttleFactorSupplier.get();
+        } else {
+            return quota;
         }
     }
 
@@ -149,12 +122,14 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public void configure(Map<String, ?> configs) {
         StaticQuotaConfig config = new StaticQuotaConfig(configs, true);
         quotaMap = config.getQuotaMap();
         storageQuotaSoft = config.getSoftStorageQuota();
         storageQuotaHard = config.getHardStorageQuota();
+        throttleFactorSupplier = new TotalConsumedThrottleFactorSupplier(storageQuotaHard, storageQuotaSoft);
         excludedPrincipalNameList = config.getExcludedPrincipalNameList();
 
         long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
