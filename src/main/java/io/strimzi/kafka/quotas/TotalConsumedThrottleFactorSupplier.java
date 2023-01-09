@@ -10,6 +10,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Gauge;
+
+import static io.strimzi.kafka.quotas.StaticQuotaCallback.metricName;
+
 @Deprecated
 public class TotalConsumedThrottleFactorSupplier implements ThrottleFactorSupplier, Consumer<Collection<Volume>> {
 
@@ -24,6 +29,22 @@ public class TotalConsumedThrottleFactorSupplier implements ThrottleFactorSuppli
     public TotalConsumedThrottleFactorSupplier(long consumedBytesHardLimit, long consumedBytesSoftLimit) {
         this.consumedBytesHardLimit = consumedBytesHardLimit;
         this.consumedBytesSoftLimit = consumedBytesSoftLimit;
+
+        Metrics.newGauge(metricName(StorageChecker.class, "TotalStorageUsedBytes"), new Gauge<Long>() {
+            public Long value() {
+                return storageUsed.get();
+            }
+        });
+        Metrics.newGauge(metricName(StorageChecker.class, "SoftLimitBytes"), new Gauge<Long>() {
+            public Long value() {
+                return consumedBytesSoftLimit;
+            }
+        });
+        Metrics.newGauge(metricName(StorageChecker.class, "HardLimitBytes"), new Gauge<Long>() {
+            public Long value() {
+                return consumedBytesHardLimit;
+            }
+        });
     }
 
     @Override

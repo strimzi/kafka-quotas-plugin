@@ -42,7 +42,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final Set<ClientQuotaType> resetQuota = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private volatile ThrottleFactorSupplier throttleFactorSupplier = UnlimitedThrottleSupplier.UNLIMITED_QUOTA_SUPPLIER;
     private final VolumeSourceBuilder volumeSourceBuilder;
-    private final String scope = "io.strimzi.kafka.quotas.StaticQuotaCallback";
+    private final static String SCOPE = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
     private final ScheduledExecutorService backgroundScheduler;
 
@@ -115,7 +115,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             closeExecutorService();
             volumeSourceBuilder.close();
         } finally {
-            Metrics.defaultRegistry().allMetrics().keySet().stream().filter(m -> scope.equals(m.getScope())).forEach(Metrics.defaultRegistry()::removeMetric);
+            Metrics.defaultRegistry().allMetrics().keySet().stream().filter(m -> SCOPE.equals(m.getScope())).forEach(Metrics.defaultRegistry()::removeMetric);
         }
     }
 
@@ -133,29 +133,13 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
 
         if (storageCheckIntervalMillis > 0L) {
-            Runnable job = volumeSourceBuilder.withConfig(config).withVolumeConsumer(this::updateVolumes).build();
+            Runnable job = volumeSourceBuilder.withConfig(config).withVolumeConsumer(throttleFactorSupplier).build();
             backgroundScheduler.scheduleWithFixedDelay(job, storageCheckIntervalMillis, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
             log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
         }
         if (!excludedPrincipalNameList.isEmpty()) {
             log.info("Excluded principals {}", excludedPrincipalNameList);
         }
-
-        Metrics.newGauge(metricName(StorageChecker.class, "TotalStorageUsedBytes"), new Gauge<Long>() {
-            public Long value() {
-                return storageUsed.get();
-            }
-        });
-        Metrics.newGauge(metricName(StorageChecker.class, "SoftLimitBytes"), new Gauge<Long>() {
-            public Long value() {
-                return storageQuotaSoft;
-            }
-        });
-        Metrics.newGauge(metricName(StorageChecker.class, "HardLimitBytes"), new Gauge<Long>() {
-            public Long value() {
-                return storageQuotaHard;
-            }
-        });
 
         quotaMap.forEach((clientQuotaType, quota) -> {
             String name = clientQuotaType.name().toUpperCase(ENGLISH).charAt(0) + clientQuotaType.name().toLowerCase(ENGLISH).substring(1);
@@ -171,11 +155,11 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
     }
 
-    private MetricName metricName(Class<?> clazz, String name) {
+    static MetricName metricName(Class<?> clazz, String name) {
         String group = clazz.getPackageName();
         String type = clazz.getSimpleName();
         String mBeanName = String.format("%s:type=%s,name=%s", group, type, name);
-        return new MetricName(group, type, name, this.scope, mBeanName);
+        return new MetricName(group, type, name, SCOPE, mBeanName);
     }
 
     private static class ClientQuotaGauge extends Gauge<Double> {
