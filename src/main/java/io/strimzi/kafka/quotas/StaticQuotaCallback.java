@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -123,9 +124,19 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     public void configure(Map<String, ?> configs) {
         StaticQuotaConfig config = new StaticQuotaConfig(configs, true);
         quotaMap = config.getQuotaMap();
-        storageQuotaSoft = config.getSoftStorageQuota();
-        storageQuotaHard = config.getHardStorageQuota();
-        throttleFactorSupplier = new AvailableBytesThrottleFactorSupplier(100);
+        final Optional<Long> availableBytesLimitConfig = config.getAvailableBytesLimit();
+
+        if (availableBytesLimitConfig.isPresent()) {
+            throttleFactorSupplier = new AvailableBytesThrottleFactorSupplier(availableBytesLimitConfig.get());
+            log.info("Available bytes limit {}", availableBytesLimitConfig.get());
+        } else {
+            storageQuotaSoft = config.getSoftStorageQuota();
+            storageQuotaHard = config.getHardStorageQuota();
+
+            throttleFactorSupplier = new TotalConsumedThrottleFactorSupplier(storageQuotaHard, storageQuotaSoft);
+            log.info("Total consumed Storage quota (soft, hard): ({}, {}).", storageQuotaSoft, storageQuotaHard);
+        }
+
         throttleFactorSupplier.addUpdateListener(() -> resetQuota.add(ClientQuotaType.PRODUCE));
         excludedPrincipalNameList = config.getExcludedPrincipalNameList();
 
@@ -134,8 +145,9 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         if (storageCheckIntervalMillis > 0L) {
             Runnable job = volumeSourceBuilder.withConfig(config).withVolumeConsumer(throttleFactorSupplier).build();
             backgroundScheduler.scheduleWithFixedDelay(job, 0, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
-            log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
+            log.info("Configured quota callback with {}. Storage check interval: {}ms", quotaMap, storageCheckIntervalMillis);
         }
+
         if (!excludedPrincipalNameList.isEmpty()) {
             log.info("Excluded principals {}", excludedPrincipalNameList);
         }

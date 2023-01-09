@@ -113,7 +113,7 @@ class StaticQuotaCallbackTest {
         target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "1"));
 
         //Verify
-        verify(scheduledExecutorService, times(1)).scheduleWithFixedDelay(any(), eq(1000L), eq(1000L), eq(TimeUnit.MILLISECONDS));
+        verify(scheduledExecutorService, times(1)).scheduleWithFixedDelay(any(), eq(0L), eq(1000L), eq(TimeUnit.MILLISECONDS));
     }
 
     @Test

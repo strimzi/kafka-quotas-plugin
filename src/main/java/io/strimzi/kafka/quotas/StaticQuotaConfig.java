@@ -32,15 +32,17 @@ import static org.slf4j.LoggerFactory.getLogger;
  * Configuration for the static quota plugin.
  */
 public class StaticQuotaConfig extends AbstractConfig {
-    static final String PRODUCE_QUOTA_PROP = "client.quota.callback.static.produce";
-    static final String FETCH_QUOTA_PROP = "client.quota.callback.static.fetch";
-    static final String REQUEST_QUOTA_PROP = "client.quota.callback.static.request";
-    static final String EXCLUDED_PRINCIPAL_NAME_LIST_PROP = "client.quota.callback.static.excluded.principal.name.list";
-    static final String STORAGE_QUOTA_SOFT_PROP = "client.quota.callback.static.storage.soft";
-    static final String STORAGE_QUOTA_HARD_PROP = "client.quota.callback.static.storage.hard";
-    static final String STORAGE_CHECK_INTERVAL_PROP = "client.quota.callback.static.storage.check-interval";
+    private static final String CLIENT_QUOTA_CALLBACK_STATIC_PREFIX = "client.quota.callback.static";
+    static final String PRODUCE_QUOTA_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".produce";
+    static final String FETCH_QUOTA_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".fetch";
+    static final String REQUEST_QUOTA_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".request";
+    static final String EXCLUDED_PRINCIPAL_NAME_LIST_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".excluded.principal.name.list";
+    static final String STORAGE_QUOTA_SOFT_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.soft";
+    static final String STORAGE_QUOTA_HARD_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.hard";
+    static final String STORAGE_CHECK_INTERVAL_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.check-interval";
     static final String LOG_DIRS_PROP = "log.dirs";
-    public static final String VOLUME_SOURCE_PROP = "client.quota.callback.static.storage.volume.source";
+    public static final String VOLUME_SOURCE_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.volume.source";
+    public static final String AVAILABLE_BYTES_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.bytes";
     private final KafkaClientConfig kafkaClientConfig;
 
     public enum VolumeSource {
@@ -64,6 +66,7 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(STORAGE_QUOTA_HARD_PROP, LONG, Long.MAX_VALUE, HIGH, "Soft limit for amount of storage allowed (in bytes)")
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
                         .define(VOLUME_SOURCE_PROP, STRING, "local", enumValidator(), HIGH, "Where to source volume usage information from.") //TODO Potentially values should be an enum
+                        .define(AVAILABLE_BYTES_PROP, LONG, null, MEDIUM, "stop message production if availableBytes <= this value")
                         .define(LOG_DIRS_PROP, LIST, List.of(), HIGH, "Broker log directories"),
                 props,
                 doLog);
@@ -89,6 +92,11 @@ public class StaticQuotaConfig extends AbstractConfig {
 
     long getSoftStorageQuota() {
         return getLong(STORAGE_QUOTA_SOFT_PROP);
+    }
+
+    Optional<Long> getAvailableBytesLimit() {
+        //TODO range validation.
+        return Optional.ofNullable(getLong(AVAILABLE_BYTES_PROP));
     }
 
     int getStorageCheckInterval() {
