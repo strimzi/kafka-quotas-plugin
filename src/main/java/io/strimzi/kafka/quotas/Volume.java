@@ -11,13 +11,13 @@ public class Volume {
     private final String brokerId;
     private final String logDir;
     private final long capacity;
-    private final long usableBytes;
+    private final long availableBytes;
 
-    public Volume(String brokerId, String logDir, long capacity, long usableBytes) {
+    public Volume(String brokerId, String logDir, long capacity, long availableBytes) {
         this.brokerId = brokerId;
         this.logDir = logDir;
         this.capacity = capacity;
-        this.usableBytes = usableBytes;
+        this.availableBytes = availableBytes;
     }
 
     public String getBrokerId() {
@@ -32,8 +32,12 @@ public class Volume {
         return capacity;
     }
 
+    public long getAvailableBytes() {
+        return availableBytes;
+    }
+
     public long getConsumedSpace() {
-        return capacity - usableBytes;
+        return capacity - availableBytes;
     }
 
     @Override
@@ -41,12 +45,12 @@ public class Volume {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Volume volume = (Volume) o;
-        return capacity == volume.capacity && usableBytes == volume.usableBytes && Objects.equals(brokerId, volume.brokerId) && Objects.equals(logDir, volume.logDir);
+        return capacity == volume.capacity && availableBytes == volume.availableBytes && Objects.equals(brokerId, volume.brokerId) && Objects.equals(logDir, volume.logDir);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(brokerId, logDir, capacity, usableBytes);
+        return Objects.hash(brokerId, logDir, capacity, availableBytes);
     }
 
     @Override
@@ -55,7 +59,7 @@ public class Volume {
                 "brokerId='" + brokerId + '\'' +
                 ", name='" + logDir + '\'' +
                 ", capacity=" + capacity +
-                ", usableBytes=" + usableBytes +
+                ", usableBytes=" + availableBytes +
                 '}';
     }
 }

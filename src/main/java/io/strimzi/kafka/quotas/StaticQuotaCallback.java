@@ -119,14 +119,13 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
     }
 
-    @SuppressWarnings("deprecation")
     @Override
     public void configure(Map<String, ?> configs) {
         StaticQuotaConfig config = new StaticQuotaConfig(configs, true);
         quotaMap = config.getQuotaMap();
         storageQuotaSoft = config.getSoftStorageQuota();
         storageQuotaHard = config.getHardStorageQuota();
-        throttleFactorSupplier = new TotalConsumedThrottleFactorSupplier(storageQuotaHard, storageQuotaSoft);
+        throttleFactorSupplier = new AvailableBytesThrottleFactorSupplier(100);
         throttleFactorSupplier.addUpdateListener(() -> resetQuota.add(ClientQuotaType.PRODUCE));
         excludedPrincipalNameList = config.getExcludedPrincipalNameList();
 
@@ -134,7 +133,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
         if (storageCheckIntervalMillis > 0L) {
             Runnable job = volumeSourceBuilder.withConfig(config).withVolumeConsumer(throttleFactorSupplier).build();
-            backgroundScheduler.scheduleWithFixedDelay(job, storageCheckIntervalMillis, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
+            backgroundScheduler.scheduleWithFixedDelay(job, 0, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
             log.info("Configured quota callback with {}. Storage quota (soft, hard): ({}, {}). Storage check interval: {}ms", quotaMap, storageQuotaSoft, storageQuotaHard, storageCheckIntervalMillis);
         }
         if (!excludedPrincipalNameList.isEmpty()) {
