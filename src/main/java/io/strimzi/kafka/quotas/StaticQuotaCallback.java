@@ -144,9 +144,11 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
 
         if (storageCheckIntervalMillis > 0L) {
-            Runnable job = volumeSourceBuilder.withConfig(config).withVolumeConsumer(throttleFactorSupplier).build();
-            backgroundScheduler.scheduleWithFixedDelay(job, 0, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
+            Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeConsumer(throttleFactorSupplier).build();
+            backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
             log.info("Configured quota callback with {}. Storage check interval: {}ms", quotaMap, storageCheckIntervalMillis);
+        } else {
+            log.warn("Static quota callback configured to never check usage: set {} to a positive value to enable", StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP);
         }
 
         if (!excludedPrincipalNameList.isEmpty()) {

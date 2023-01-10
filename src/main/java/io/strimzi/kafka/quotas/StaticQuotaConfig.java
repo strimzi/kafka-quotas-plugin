@@ -4,11 +4,10 @@
  */
 package io.strimzi.kafka.quotas;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -41,14 +40,8 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String STORAGE_QUOTA_HARD_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.hard";
     static final String STORAGE_CHECK_INTERVAL_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.check-interval";
     static final String LOG_DIRS_PROP = "log.dirs";
-    public static final String VOLUME_SOURCE_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.volume.source";
     public static final String AVAILABLE_BYTES_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.bytes";
     private final KafkaClientConfig kafkaClientConfig;
-
-    public enum VolumeSource {
-        CLUSTER,
-        LOCAL,
-    }
 
     /**
      * Construct a configuration for the static quota plugin.
@@ -65,8 +58,7 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(STORAGE_QUOTA_SOFT_PROP, LONG, Long.MAX_VALUE, HIGH, "Hard limit for amount of storage allowed (in bytes)")
                         .define(STORAGE_QUOTA_HARD_PROP, LONG, Long.MAX_VALUE, HIGH, "Soft limit for amount of storage allowed (in bytes)")
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
-                        .define(VOLUME_SOURCE_PROP, STRING, "local", enumValidator(), HIGH, "Where to source volume usage information from.") //TODO Potentially values should be an enum
-                        .define(AVAILABLE_BYTES_PROP, LONG, null, MEDIUM, "stop message production if availableBytes <= this value")
+                        .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrAtLeastValidator(0), MEDIUM, "stop message production if availableBytes <= this value")
                         .define(LOG_DIRS_PROP, LIST, List.of(), HIGH, "Broker log directories"),
                 props,
                 doLog);
@@ -115,12 +107,13 @@ public class StaticQuotaConfig extends AbstractConfig {
         return kafkaClientConfig;
     }
 
-    public VolumeSource getVolumeSource() {
-        return VolumeSource.valueOf(getString(VOLUME_SOURCE_PROP).toUpperCase(Locale.ROOT));
-    }
-
-    private static ConfigDef.LambdaValidator enumValidator() {
-        return ConfigDef.LambdaValidator.with((name, value) -> VolumeSource.valueOf(String.valueOf(value).toUpperCase(Locale.ROOT)), () -> "Must be one of " + Arrays.toString(VolumeSource.values()));
+    private static ConfigDef.LambdaValidator nullOrAtLeastValidator(int min) {
+        ConfigDef.Range atLeast = ConfigDef.Range.atLeast(min);
+        return ConfigDef.LambdaValidator.with((name, value) -> {
+            if (value != null) {
+                atLeast.ensureValid(name, value);
+            }
+        }, atLeast::toString);
     }
 
     static class KafkaClientConfig extends AbstractConfig {

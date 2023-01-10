@@ -4,14 +4,10 @@
  */
 package io.strimzi.kafka.quotas;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -54,22 +50,11 @@ public class VolumeSourceBuilder implements AutoCloseable {
     }
 
     Runnable build() {
-        switch (config.getVolumeSource()) {
-            case CLUSTER:
-                if (!kip827Available.get()) {
-                    throw new IllegalStateException("Cluster volume source selected but KIP-827 not available");
-                }
-                adminClient = adminClientFactory.apply(config.getKafkaClientConfig());
-                return new ClusterVolumeSource(adminClient, volumesConsumer);
-            case LOCAL: //make it explicit
-            default:
-                List<Path> logDirs = config.getLogDirs().stream().map(Paths::get).collect(Collectors.toList());
-                StorageChecker storageChecker = new StorageChecker();
-                storageChecker.configure(
-                        logDirs,
-                        volumesConsumer);
-                return storageChecker;
+        if (!kip827Available.get()) {
+            throw new IllegalStateException("KIP-827 not available, this plugin requires broker version >= 3.3");
         }
+        adminClient = adminClientFactory.apply(config.getKafkaClientConfig());
+        return new ClusterVolumeSource(adminClient, volumesConsumer);
     }
 
     @Override

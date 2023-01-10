@@ -8,11 +8,13 @@ package io.strimzi.kafka.quotas;
 import java.util.Map;
 
 import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.common.config.ConfigException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 
 class StaticQuotaConfigTest {
@@ -53,5 +55,13 @@ class StaticQuotaConfigTest {
                 fail(AdminClientConfig.CLIENT_ID_CONFIG + " was not a string");
             }
         });
+    }
+
+    @Test
+    void negativeAvailableBytesNotAllowed() {
+        //When
+        assertThatThrownBy(() -> new StaticQuotaConfig(Map.of(StaticQuotaConfig.AVAILABLE_BYTES_PROP, "-1"), true))
+                .isInstanceOf(ConfigException.class)
+                .hasMessageContaining("Invalid value -1");
     }
 }
