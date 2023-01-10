@@ -30,17 +30,17 @@ public class TotalConsumedThrottleFactorSupplier implements ThrottleFactorSuppli
         this.consumedBytesHardLimit = consumedBytesHardLimit;
         this.consumedBytesSoftLimit = consumedBytesSoftLimit;
 
-        Metrics.newGauge(metricName(StorageChecker.class, "TotalStorageUsedBytes"), new Gauge<Long>() {
+        Metrics.newGauge(metricName("TotalStorageUsedBytes", "StorageChecker", "io.strimzi.kafka.quotas"), new Gauge<Long>() {
             public Long value() {
                 return storageUsed.get();
             }
         });
-        Metrics.newGauge(metricName(StorageChecker.class, "SoftLimitBytes"), new Gauge<Long>() {
+        Metrics.newGauge(metricName("SoftLimitBytes", "StorageChecker", "io.strimzi.kafka.quotas"), new Gauge<Long>() {
             public Long value() {
                 return consumedBytesSoftLimit;
             }
         });
-        Metrics.newGauge(metricName(StorageChecker.class, "HardLimitBytes"), new Gauge<Long>() {
+        Metrics.newGauge(metricName("HardLimitBytes", "StorageChecker", "io.strimzi.kafka.quotas"), new Gauge<Long>() {
             public Long value() {
                 return consumedBytesHardLimit;
             }
