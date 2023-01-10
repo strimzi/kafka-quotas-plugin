@@ -42,7 +42,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class StaticQuotaCallbackTest {
 
-    public static final Map<String, Integer> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10);
+    public static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10, StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092");
 
     @Mock(lenient = true)
     VolumeSourceBuilder volumeSourceBuilder;
@@ -72,7 +72,7 @@ class StaticQuotaCallbackTest {
     @Test
     void quotaDefaults() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
-        target.configure(Map.of());
+        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
 
         double produceQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(Double.MAX_VALUE, produceQuotaLimit);
@@ -84,7 +84,8 @@ class StaticQuotaCallbackTest {
     @Test
     void produceQuota() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
-        target.configure(Map.of(StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024));
+        target.configure(Map.of(StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
 
         double quotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(1024, quotaLimit);
@@ -94,7 +95,8 @@ class StaticQuotaCallbackTest {
     void excludedPrincipal() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
         target.configure(Map.of(StaticQuotaConfig.EXCLUDED_PRINCIPAL_NAME_LIST_PROP, "foo,bar",
-                StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024));
+                StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
         double fooQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(Double.MAX_VALUE, fooQuotaLimit);
 
@@ -110,10 +112,10 @@ class StaticQuotaCallbackTest {
         StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
 
         //When
-        target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "1"));
+        target.configure(MINIMUM_EXECUTABLE_CONFIG);
 
         //Verify
-        verify(scheduledExecutorService, times(1)).scheduleWithFixedDelay(any(), eq(0L), eq(1000L), eq(TimeUnit.MILLISECONDS));
+        verify(scheduledExecutorService, times(1)).scheduleWithFixedDelay(any(), eq(0L), eq(10000L), eq(TimeUnit.MILLISECONDS));
     }
 
     @Test
@@ -123,7 +125,7 @@ class StaticQuotaCallbackTest {
         StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
 
         //When
-        target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "0"));
+        target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "0", StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
 
         //Then
         verify(scheduledExecutorService, times(0)).scheduleWithFixedDelay(any(), anyLong(), anyLong(), any(TimeUnit.class));
@@ -136,7 +138,7 @@ class StaticQuotaCallbackTest {
         StaticQuotaCallback target = new StaticQuotaCallback(StaticQuotaCallbackTest.this.volumeSourceBuilder, scheduledExecutorService);
 
         //When
-        target.configure(Map.of());
+        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
 
         //Then
         verify(scheduledExecutorService, times(0)).scheduleWithFixedDelay(any(), anyLong(), anyLong(), any(TimeUnit.class));
@@ -215,7 +217,8 @@ class StaticQuotaCallbackTest {
         quotaCallback.configure(Map.of(
                 StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 15L,
                 StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 16L,
-                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10,
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
         ));
 
         argument.getValue().accept(List.of(newVolume(17)));
@@ -240,7 +243,8 @@ class StaticQuotaCallbackTest {
         target.configure(Map.of(
                 StaticQuotaConfig.PRODUCE_QUOTA_PROP, 15.0,
                 StaticQuotaConfig.FETCH_QUOTA_PROP, 16.0,
-                StaticQuotaConfig.REQUEST_QUOTA_PROP, 17.0
+                StaticQuotaConfig.REQUEST_QUOTA_PROP, 17.0,
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
         ));
 
         SortedMap<MetricName, Metric> group = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "StaticQuotaCallback");

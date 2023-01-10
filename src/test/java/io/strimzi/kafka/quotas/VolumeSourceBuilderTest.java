@@ -41,7 +41,8 @@ class VolumeSourceBuilderTest {
     @Test
     void shouldReturnClusterVolumeSource() {
         //Given
-        volumeSourceBuilder.withConfig(new StaticQuotaConfig(Map.of("bootstrap.servers", "localhost:9091"), false));
+        volumeSourceBuilder.withConfig(new StaticQuotaConfig(Map.of("bootstrap.servers", "localhost:9091",
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"), false));
 
         //When
         final Runnable configuredRunnable = volumeSourceBuilder.build();
@@ -54,7 +55,7 @@ class VolumeSourceBuilderTest {
     void shouldFailIfKip827NotAvailable() {
         //Given
         try (final VolumeSourceBuilder noKip827Factory = new VolumeSourceBuilder(() -> false, config -> adminClient)) {
-            noKip827Factory.withConfig(new StaticQuotaConfig(Map.of(), false));
+            noKip827Factory.withConfig(new StaticQuotaConfig(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"), false));
             //When
             assertThrows(IllegalStateException.class, noKip827Factory::build);
         }

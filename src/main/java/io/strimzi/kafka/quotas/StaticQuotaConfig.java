@@ -10,9 +10,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.server.quota.ClientQuotaType;
 import org.slf4j.Logger;
@@ -41,6 +43,7 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String STORAGE_CHECK_INTERVAL_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.check-interval";
     static final String LOG_DIRS_PROP = "log.dirs";
     public static final String AVAILABLE_BYTES_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.bytes";
+    public static final String ADMIN_BOOTSTRAP_SERVER_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.bootstrap.servers";
     private final KafkaClientConfig kafkaClientConfig;
 
     /**
@@ -117,13 +120,24 @@ public class StaticQuotaConfig extends AbstractConfig {
     }
 
     static class KafkaClientConfig extends AbstractConfig {
-        public static final String CLIENT_ID_PREFIX_PROP = "client.quota.callback.kafka.clientIdPrefix";
-        public static final String ADMIN_CONFIG_PREFIX = "client.quota.callback.kafka.admin.";
+        public static final String CLIENT_ID_PREFIX_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.clientIdPrefix";
+        public static final String ADMIN_CONFIG_PREFIX = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.";
         private final Logger log = getLogger(KafkaClientConfig.class);
 
+        @SuppressWarnings("unchecked")
         public KafkaClientConfig(Map<String, ?> props, boolean doLog) {
             super(new ConfigDef()
-                            .define(CLIENT_ID_PREFIX_PROP, STRING, "__strimzi", LOW, "Prefix to use when creating client.ids"),
+                            .define(CLIENT_ID_PREFIX_PROP, STRING, "__strimzi", LOW, "Prefix to use when creating client.ids")
+                            .define(ADMIN_BOOTSTRAP_SERVER_PROP, LIST, ConfigDef.NO_DEFAULT_VALUE, ConfigDef.LambdaValidator.with((name, value) -> {
+                                if (value instanceof List) {
+                                    final List<String> configuredValue = (List<String>) value;
+                                    if (configuredValue.isEmpty()) {
+                                        throw new ConfigException(name, value, "Value was an empty list");
+                                    }
+                                } else {
+                                    throw new ConfigException(name, value, "Value was not a List");
+                                }
+                            }, () -> "Invalid bootstrap servers provided."), HIGH, CommonClientConfigs.BOOTSTRAP_SERVERS_DOC),
                     props,
                     doLog);
         }
