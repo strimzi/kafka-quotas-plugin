@@ -46,16 +46,8 @@ public class TotalConsumedThrottleFactorSupplier implements ThrottleFactorSuppli
                 return storageUsed.get();
             }
         });
-        Metrics.newGauge(metricName("SoftLimitBytes", "StorageChecker", "io.strimzi.kafka.quotas"), new Gauge<Long>() {
-            public Long value() {
-                return consumedBytesSoftLimit;
-            }
-        });
-        Metrics.newGauge(metricName("HardLimitBytes", "StorageChecker", "io.strimzi.kafka.quotas"), new Gauge<Long>() {
-            public Long value() {
-                return consumedBytesHardLimit;
-            }
-        });
+        Metrics.newGauge(metricName("SoftLimitBytes", "StorageChecker", "io.strimzi.kafka.quotas"), new StaticLongGauge(consumedBytesSoftLimit));
+        Metrics.newGauge(metricName("HardLimitBytes", "StorageChecker", "io.strimzi.kafka.quotas"), new StaticLongGauge(consumedBytesHardLimit));
     }
 
     @Override
@@ -85,4 +77,18 @@ public class TotalConsumedThrottleFactorSupplier implements ThrottleFactorSuppli
             }
         }
     }
+    private static class StaticLongGauge extends Gauge<Long> {
+        private final Long value;
+
+        private StaticLongGauge(Long value) {
+            this.value = value;
+        }
+
+        @Override
+        public Long value() {
+            return value;
+        }
+    }
 }
+
+
