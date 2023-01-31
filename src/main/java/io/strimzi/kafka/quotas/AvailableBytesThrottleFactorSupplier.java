@@ -16,7 +16,7 @@ public class AvailableBytesThrottleFactorSupplier implements ThrottleFactorSuppl
     private final List<Runnable> listeners;
     private final long availableBytesLimit;
 
-    private volatile double factor = 1.0;
+    private volatile boolean throttled = false;
 
     /**
      * Creates and configures the throttle factor supplier
@@ -33,24 +33,20 @@ public class AvailableBytesThrottleFactorSupplier implements ThrottleFactorSuppl
      */
     @Override
     public void accept(Collection<Volume> volumes) {
-        double initial = factor;
-        factor = calculateNewFactor(volumes);
-        if (factor != initial) {
+        boolean initial = throttled;
+        throttled = calculateNewFactor(volumes);
+        if (throttled != initial) {
             listeners.forEach(Runnable::run);
         }
     }
 
-    private double calculateNewFactor(Collection<Volume> volumes) {
-        if (volumes.stream().anyMatch(volume -> volume.getAvailableBytes() <= availableBytesLimit)) {
-            return 0.0;
-        } else {
-            return 1.0;
-        }
+    private boolean calculateNewFactor(Collection<Volume> volumes) {
+        return volumes.stream().anyMatch(volume -> volume.getAvailableBytes() <= availableBytesLimit);
     }
 
     @Override
     public Double get() {
-        return factor;
+        return throttled ? 0.0 : 1.0;
     }
 
     @Override
