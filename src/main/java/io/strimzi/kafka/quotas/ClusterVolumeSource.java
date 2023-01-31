@@ -23,6 +23,13 @@ import org.slf4j.LoggerFactory;
 
 import static java.util.stream.Collectors.toSet;
 
+
+/**
+ * Leverages <a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-827%3A+Expose+log+dirs+total+and+usable+space+via+Kafka+API">KIP-827</a>
+ * to gather volume usage statistics for each Kafka log dir reported by the cluster.
+ *
+ * A listener is registered with this volume source to act on the disk usage information.
+ */
 public class ClusterVolumeSource implements Runnable {
 
     private final Consumer<Collection<Volume>> volumeConsumer;
@@ -30,6 +37,10 @@ public class ClusterVolumeSource implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(ClusterVolumeSource.class);
 
+    /**
+     * @param admin The Kafka Admin client to be used for gathering inf
+     * @param volumeConsumer the listener to be notified of the volume usage.
+     */
     public ClusterVolumeSource(Admin admin, Consumer<Collection<Volume>> volumeConsumer) {
         this.volumeConsumer = volumeConsumer;
         this.admin = admin;

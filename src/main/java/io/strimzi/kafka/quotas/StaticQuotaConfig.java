@@ -42,8 +42,8 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String STORAGE_QUOTA_HARD_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.hard";
     static final String STORAGE_CHECK_INTERVAL_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.check-interval";
     static final String LOG_DIRS_PROP = "log.dirs";
-    public static final String AVAILABLE_BYTES_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.bytes";
-    public static final String ADMIN_BOOTSTRAP_SERVER_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.bootstrap.servers";
+    static final String AVAILABLE_BYTES_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.bytes";
+    static final String ADMIN_BOOTSTRAP_SERVER_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.bootstrap.servers";
     private final KafkaClientConfig kafkaClientConfig;
 
     /**

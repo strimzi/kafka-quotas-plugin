@@ -7,12 +7,22 @@ package io.strimzi.kafka.quotas;
 
 import java.util.Objects;
 
+/**
+ * Represents a single volume on a specific Kafka broker.
+ */
 public class Volume {
     private final String brokerId;
     private final String logDir;
     private final long capacity;
     private final long availableBytes;
 
+    /**
+     *
+     * @param brokerId which broker does this volume belong too
+     * @param logDir the specific logDir the volume hosts
+     * @param capacity How many bytes the volume holds
+     * @param availableBytes How many available bytes remain on the volume.
+     */
     public Volume(String brokerId, String logDir, long capacity, long availableBytes) {
         this.brokerId = brokerId;
         this.logDir = logDir;
@@ -20,22 +30,41 @@ public class Volume {
         this.availableBytes = availableBytes;
     }
 
+    /**
+     *
+     * @return The brokerId for the broker holding the volume
+     */
     public String getBrokerId() {
         return brokerId;
     }
 
+    /**
+     *
+     * @return the path identifying the logDir on the broker its hosted by.
+     */
     public String getLogDir() {
         return logDir;
     }
 
+    /**
+     * @return The size of the volume in bytes.
+     */
     public long getCapacity() {
         return capacity;
     }
 
+    /**
+     *
+     * @return The number available (free) remaining on the volume.
+     */
     public long getAvailableBytes() {
         return availableBytes;
     }
 
+    /**
+     *
+     * @return The number of bytes on the volume which have been consumed (used).
+     */
     public long getConsumedSpace() {
         return capacity - availableBytes;
     }

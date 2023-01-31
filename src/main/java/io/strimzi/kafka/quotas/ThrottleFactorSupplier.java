@@ -16,6 +16,10 @@ import java.util.function.Supplier;
  * A value of `0.0` implies that there is no quota available regardless of the defined quota.
  */
 public interface ThrottleFactorSupplier extends Supplier<Double>, Consumer<Collection<Volume>> {
+    /**
+     * Register a listener to be invoked when the throttle factor is changed.
+     * @param listener to be executed whenever the factor is updated.
+     */
     void addUpdateListener(Runnable listener);
 
 }

@@ -7,8 +7,14 @@ package io.strimzi.kafka.quotas;
 
 import java.util.Collection;
 
+/**
+ * An implementation of {@link ThrottleFactorSupplier} which applies no limits.
+ */
 public class UnlimitedThrottleSupplier implements ThrottleFactorSupplier {
 
+    /**
+     * Global singleton instance of the Unlimited supplier.
+     */
     public static final UnlimitedThrottleSupplier UNLIMITED_QUOTA_SUPPLIER = new UnlimitedThrottleSupplier();
 
     private UnlimitedThrottleSupplier() {
