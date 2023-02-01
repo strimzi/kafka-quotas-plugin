@@ -9,10 +9,15 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.slf4j.Logger;
+
+import static org.slf4j.LoggerFactory.getLogger;
+
 /**
  * Determines if the number of available bytes on any given volume falls below the configured limit.
  */
 public class AvailableBytesThrottleFactorSupplier implements ThrottleFactorSupplier {
+    private final Logger log = getLogger(AvailableBytesThrottleFactorSupplier.class);
     private final List<Runnable> listeners;
     private final long availableBytesLimit;
 
@@ -36,6 +41,7 @@ public class AvailableBytesThrottleFactorSupplier implements ThrottleFactorSuppl
         boolean initial = throttled;
         throttled = calculateNewFactor(volumes);
         if (throttled != initial) {
+            log.debug("throttle status changed from: {} to {} on update", initial, throttled);
             listeners.forEach(Runnable::run);
         }
     }
