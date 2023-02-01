@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.DescribeClusterResult;
 import org.apache.kafka.clients.admin.DescribeLogDirsResult;
@@ -27,7 +28,7 @@ import static java.util.stream.Collectors.toSet;
 /**
  * Leverages <a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-827%3A+Expose+log+dirs+total+and+usable+space+via+Kafka+API">KIP-827</a>
  * to gather volume usage statistics for each Kafka log dir reported by the cluster.
- *
+ * <p>
  * A listener is registered with this volume source to act on the disk usage information.
  */
 public class ClusterVolumeSource implements Runnable {
@@ -41,6 +42,7 @@ public class ClusterVolumeSource implements Runnable {
      * @param admin The Kafka Admin client to be used for gathering inf
      * @param volumeConsumer the listener to be notified of the volume usage.
      */
+    @SuppressFBWarnings("EI_EXPOSE_REP2") //Injecting the dependency is the right move as it can be shared
     public ClusterVolumeSource(Admin admin, Consumer<Collection<Volume>> volumeConsumer) {
         this.volumeConsumer = volumeConsumer;
         this.admin = admin;

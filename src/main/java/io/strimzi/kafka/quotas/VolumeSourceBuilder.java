@@ -9,6 +9,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.LogDirDescription;
@@ -30,6 +31,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
      * Default production constructor for production usage.
      * Which will lazily create a Kafka admin client using the supplied config.
      */
+    @SuppressFBWarnings("MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR") //false positive we are just passing the method reference
     public VolumeSourceBuilder() {
         this(VolumeSourceBuilder::testForKip827, kafkaClientConfig -> AdminClient.create(kafkaClientConfig.getKafkaClientConfig()));
     }
@@ -37,7 +39,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
     /**
      * Secondary constructor visible for testing.
      * @param kip827Available used to determine if KIP-827 API's are available
-     * @param adminClientFactory factory function for creating Admin clients with the builders config.
+     * @param adminClientFactory factory function for creating Admin clients with the builders' config.
      */
     /* test */ VolumeSourceBuilder(Supplier<Boolean> kip827Available, Function<StaticQuotaConfig.KafkaClientConfig, Admin> adminClientFactory) {
         this.kip827Available = kip827Available;
