@@ -105,7 +105,7 @@
 
         <!-- property to skip surefire tests during failsafe execution -->
         <skip.surefire.tests>${skipTests}</skip.surefire.tests>
-	</properties>
+    </properties>
 
     <distributionManagement>
         <snapshotRepository>
@@ -185,8 +185,7 @@
         <dependency>
             <groupId>com.github.spotbugs</groupId>
             <artifactId>spotbugs-annotations</artifactId>
-            <version>4.7.2</version>
-
+            <version>${spotbugs.version}</version>
         </dependency>
     </dependencies>
 
