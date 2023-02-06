@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,12 +44,13 @@ import static org.mockito.Mockito.when;
 class StaticQuotaCallbackTest {
 
     public static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10, StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092");
+    private static final int VOLUME_CAPACITY = 50;
 
     @Mock(lenient = true)
     VolumeSourceBuilder volumeSourceBuilder;
 
     private static VolumeUsage newVolume(int consumedSpace) {
-        return new VolumeUsage("-1", "test", 50, 50 - consumedSpace);
+        return new VolumeUsage("-1", "test", VOLUME_CAPACITY, VOLUME_CAPACITY - consumedSpace);
     }
 
     StaticQuotaCallback target;
@@ -60,8 +62,7 @@ class StaticQuotaCallbackTest {
         target = new StaticQuotaCallback();
         when(volumeSourceBuilder.withConfig(any())).thenReturn(volumeSourceBuilder);
         when(volumeSourceBuilder.withVolumeConsumer(any())).thenReturn(volumeSourceBuilder);
-        when(volumeSourceBuilder.build()).thenReturn(() -> {
-        });
+        when(volumeSourceBuilder.build()).thenReturn(Mockito.mock(VolumeSource.class));
     }
 
     @AfterEach

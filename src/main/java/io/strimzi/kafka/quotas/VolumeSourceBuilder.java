@@ -75,7 +75,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
         return this;
     }
 
-    Runnable build() {
+    VolumeSource build() {
         if (!kip827Available.get()) {
             throw new IllegalStateException("KIP-827 not available, this plugin requires broker version >= 3.3");
         }
