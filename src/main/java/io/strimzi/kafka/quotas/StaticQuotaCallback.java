@@ -41,7 +41,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private volatile long storageQuotaHard = Long.MAX_VALUE;
     private volatile List<String> excludedPrincipalNameList = List.of();
     private final Set<ClientQuotaType> resetQuota = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private volatile ThrottleFactorSupplier throttleFactorSupplier = UnlimitedThrottleSupplier.UNLIMITED_QUOTA_SUPPLIER;
+    private volatile ThrottleFactorPolicy throttleFactorPolicy = UnlimitedThrottleSupplier.UNLIMITED_QUOTA_SUPPLIER;
     private final VolumeSourceBuilder volumeSourceBuilder;
     private final static String SCOPE = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
@@ -91,7 +91,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         double quota = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
 
         if (ClientQuotaType.PRODUCE.equals(quotaType)) {
-            return quota * throttleFactorSupplier.get();
+            return quota * throttleFactorPolicy.get();
         } else {
             return quota;
         }
@@ -135,23 +135,23 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         final Optional<Long> availableBytesLimitConfig = config.getAvailableBytesLimit();
 
         if (availableBytesLimitConfig.isPresent()) {
-            throttleFactorSupplier = new AvailableBytesThrottleFactorSupplier(availableBytesLimitConfig.get());
+            throttleFactorPolicy = new AvailableBytesThrottleFactorPolicy(availableBytesLimitConfig.get());
             log.info("Available bytes limit {}", availableBytesLimitConfig.get());
         } else {
             storageQuotaSoft = config.getSoftStorageQuota();
             storageQuotaHard = config.getHardStorageQuota();
 
-            throttleFactorSupplier = new TotalConsumedThrottleFactorSupplier(storageQuotaHard, storageQuotaSoft);
+            throttleFactorPolicy = new TotalConsumedThrottleFactorPolicy(storageQuotaHard, storageQuotaSoft);
             log.info("Total consumed Storage quota (soft, hard): ({}, {}).", storageQuotaSoft, storageQuotaHard);
         }
 
-        throttleFactorSupplier.addUpdateListener(() -> resetQuota.add(ClientQuotaType.PRODUCE));
+        throttleFactorPolicy.addUpdateListener(() -> resetQuota.add(ClientQuotaType.PRODUCE));
         excludedPrincipalNameList = config.getExcludedPrincipalNameList();
 
         long storageCheckIntervalMillis = TimeUnit.SECONDS.toMillis(config.getStorageCheckInterval());
 
         if (storageCheckIntervalMillis > 0L) {
-            Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeConsumer(throttleFactorSupplier).build();
+            Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeConsumer(throttleFactorPolicy).build();
             backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckIntervalMillis, TimeUnit.MILLISECONDS);
             log.info("Configured quota callback with {}. Storage check interval: {}ms", quotaMap, storageCheckIntervalMillis);
         } else {

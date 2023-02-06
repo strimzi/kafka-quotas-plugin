@@ -21,7 +21,7 @@ import static io.strimzi.kafka.quotas.StaticQuotaCallback.metricName;
  * It will progressively increase the throttle factor as the usage grows between the hard and soft limits. Once the usage is greater than or equal to the hard limit the throttle factor will be {@code 0}.
  */
 @Deprecated
-public class TotalConsumedThrottleFactorSupplier implements ThrottleFactorSupplier, Consumer<Collection<VolumeUsage>> {
+public class TotalConsumedThrottleFactorPolicy implements ThrottleFactorPolicy, Consumer<Collection<VolumeUsage>> {
 
     List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final long consumedBytesHardLimit;
@@ -37,7 +37,7 @@ public class TotalConsumedThrottleFactorSupplier implements ThrottleFactorSuppli
      * @param consumedBytesHardLimit the total number of bytes once reached (or exceeded) the full throttle should apply.
      * @param consumedBytesSoftLimit the total number of bytes once passed the throttling should apply.
      */
-    public TotalConsumedThrottleFactorSupplier(long consumedBytesHardLimit, long consumedBytesSoftLimit) {
+    public TotalConsumedThrottleFactorPolicy(long consumedBytesHardLimit, long consumedBytesSoftLimit) {
         this.consumedBytesHardLimit = consumedBytesHardLimit;
         this.consumedBytesSoftLimit = consumedBytesSoftLimit;
 

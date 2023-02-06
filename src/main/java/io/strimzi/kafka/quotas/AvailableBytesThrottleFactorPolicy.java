@@ -16,8 +16,8 @@ import static org.slf4j.LoggerFactory.getLogger;
 /**
  * Determines if the number of available bytes on any given volume falls below the configured limit.
  */
-public class AvailableBytesThrottleFactorSupplier implements ThrottleFactorSupplier {
-    private final Logger log = getLogger(AvailableBytesThrottleFactorSupplier.class);
+public class AvailableBytesThrottleFactorPolicy implements ThrottleFactorPolicy {
+    private final Logger log = getLogger(AvailableBytesThrottleFactorPolicy.class);
     private final List<Runnable> listeners;
     private final long availableBytesLimit;
 
@@ -27,7 +27,7 @@ public class AvailableBytesThrottleFactorSupplier implements ThrottleFactorSuppl
      * Creates and configures the throttle factor supplier
      * @param availableBytesLimit the minimum number of bytes below which the throttle should be applied.
      */
-    public AvailableBytesThrottleFactorSupplier(long availableBytesLimit) {
+    public AvailableBytesThrottleFactorPolicy(long availableBytesLimit) {
         this.availableBytesLimit = availableBytesLimit;
         listeners = new CopyOnWriteArrayList<>();
     }

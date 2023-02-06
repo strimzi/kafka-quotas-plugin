@@ -19,18 +19,18 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-class AvailableBytesThrottleFactorSupplierTest {
+class AvailableBytesThrottleFactorPolicyTest {
 
     private static final long AVAILABLE_BYTES_LIMIT = 100L;
 
     @Mock
     Runnable updateListener;
 
-    private AvailableBytesThrottleFactorSupplier availableBytesThrottleFactorSupplier;
+    private AvailableBytesThrottleFactorPolicy availableBytesThrottleFactorSupplier;
 
     @BeforeEach
     void setUp() {
-        availableBytesThrottleFactorSupplier = new AvailableBytesThrottleFactorSupplier(AVAILABLE_BYTES_LIMIT);
+        availableBytesThrottleFactorSupplier = new AvailableBytesThrottleFactorPolicy(AVAILABLE_BYTES_LIMIT);
     }
 
     @Test

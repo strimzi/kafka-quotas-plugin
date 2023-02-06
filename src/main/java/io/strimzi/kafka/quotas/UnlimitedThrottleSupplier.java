@@ -8,9 +8,9 @@ package io.strimzi.kafka.quotas;
 import java.util.Collection;
 
 /**
- * An implementation of {@link ThrottleFactorSupplier} which applies no limits.
+ * An implementation of {@link ThrottleFactorPolicy} which applies no limits.
  */
-public class UnlimitedThrottleSupplier implements ThrottleFactorSupplier {
+public class UnlimitedThrottleSupplier implements ThrottleFactorPolicy {
 
     /**
      * Global singleton instance of the Unlimited supplier.
