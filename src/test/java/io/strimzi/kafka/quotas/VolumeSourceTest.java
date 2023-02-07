@@ -32,10 +32,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-public class ClusterVolumeSourceTest {
+class VolumeSourceTest {
 
     private VolumeConsumer volumeConsumer;
-    private ClusterVolumeSource clusterVolumeSource;
+    private VolumeSource volumeSource;
     @Mock
     private Admin admin;
 
@@ -46,7 +46,7 @@ public class ClusterVolumeSourceTest {
     @BeforeEach
     void setUp() {
         volumeConsumer = new VolumeConsumer();
-        clusterVolumeSource = new ClusterVolumeSource(admin, volumeConsumer);
+        volumeSource = new VolumeSource(admin, volumeConsumer);
         final DescribeClusterResult mockDescribeClusterResult = mock(DescribeClusterResult.class);
         when(mockDescribeClusterResult.nodes()).thenReturn(KafkaFuture.completedFuture(nodes));
         when(admin.describeCluster()).thenReturn(mockDescribeClusterResult);
@@ -65,7 +65,7 @@ public class ClusterVolumeSourceTest {
         givenLogDirDescription(nodeId, "dir1", 50, 10);
 
         //When
-        clusterVolumeSource.run();
+        volumeSource.run();
 
         //Then
         final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();
@@ -83,7 +83,7 @@ public class ClusterVolumeSourceTest {
         givenLogDirDescription(nodeId, "dir2", 30, 5);
 
         //When
-        clusterVolumeSource.run();
+        volumeSource.run();
 
         //Then
         final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();
@@ -106,7 +106,7 @@ public class ClusterVolumeSourceTest {
         givenLogDirDescription(nodeId2, "dir1", 30, 5);
 
         //When
-        clusterVolumeSource.run();
+        volumeSource.run();
 
         //Then
         final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();
@@ -123,7 +123,7 @@ public class ClusterVolumeSourceTest {
         givenNode(1);
 
         //When
-        clusterVolumeSource.run();
+        volumeSource.run();
 
         //Then
         final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();

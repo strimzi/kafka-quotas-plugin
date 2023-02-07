@@ -48,7 +48,7 @@ class VolumeSourceBuilderTest {
         final Runnable configuredRunnable = volumeSourceBuilder.build();
 
         //Then
-        assertThat(configuredRunnable).isInstanceOf(ClusterVolumeSource.class);
+        assertThat(configuredRunnable).isInstanceOf(VolumeSource.class);
     }
 
     @Test

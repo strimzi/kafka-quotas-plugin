@@ -80,7 +80,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
             throw new IllegalStateException("KIP-827 not available, this plugin requires broker version >= 3.3");
         }
         adminClient = adminClientFactory.apply(config.getKafkaClientConfig());
-        return new ClusterVolumeSource(adminClient, volumesConsumer);
+        return new VolumeSource(adminClient, volumesConsumer);
     }
 
     @Override

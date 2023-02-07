@@ -31,19 +31,19 @@ import static java.util.stream.Collectors.toSet;
  * <p>
  * A listener is registered with this volume source to act on the disk usage information.
  */
-public class ClusterVolumeSource implements Runnable {
+public class VolumeSource implements Runnable {
 
     private final Consumer<Collection<VolumeUsage>> volumeConsumer;
     private final Admin admin;
 
-    private static final Logger log = LoggerFactory.getLogger(ClusterVolumeSource.class);
+    private static final Logger log = LoggerFactory.getLogger(VolumeSource.class);
 
     /**
      * @param admin The Kafka Admin client to be used for gathering inf
      * @param volumeConsumer the listener to be notified of the volume usage.
      */
     @SuppressFBWarnings("EI_EXPOSE_REP2") //Injecting the dependency is the right move as it can be shared
-    public ClusterVolumeSource(Admin admin, Consumer<Collection<VolumeUsage>> volumeConsumer) {
+    public VolumeSource(Admin admin, Consumer<Collection<VolumeUsage>> volumeConsumer) {
         this.volumeConsumer = volumeConsumer;
         this.admin = admin;
     }
@@ -81,7 +81,7 @@ public class ClusterVolumeSource implements Runnable {
 
     private void onDescribeLogDirsSuccess(Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker) {
         final List<VolumeUsage> volumes = logDirsPerBroker.entrySet().stream()
-                .flatMap(ClusterVolumeSource::toVolumes).collect(Collectors.toUnmodifiableList());
+                .flatMap(VolumeSource::toVolumes).collect(Collectors.toUnmodifiableList());
         if (log.isDebugEnabled()) {
             log.debug("Notifying consumers of volumes: " + volumes);
         }
