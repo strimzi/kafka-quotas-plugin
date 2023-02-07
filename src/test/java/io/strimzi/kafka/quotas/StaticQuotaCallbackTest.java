@@ -4,7 +4,6 @@
  */
 package io.strimzi.kafka.quotas;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -12,7 +11,6 @@ import java.util.SortedMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Gauge;
@@ -61,7 +59,7 @@ class StaticQuotaCallbackTest {
     void setup() {
         target = new StaticQuotaCallback();
         when(volumeSourceBuilder.withConfig(any())).thenReturn(volumeSourceBuilder);
-        when(volumeSourceBuilder.withVolumeConsumer(any())).thenReturn(volumeSourceBuilder);
+        when(volumeSourceBuilder.withVolumeObserver(any())).thenReturn(volumeSourceBuilder);
         when(volumeSourceBuilder.build()).thenReturn(Mockito.mock(VolumeSource.class));
     }
 
@@ -159,14 +157,13 @@ class StaticQuotaCallbackTest {
         verify(scheduledExecutorService, times(1)).shutdownNow();
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     void quotaResetRequiredShouldRespectQuotaType() {
-        ArgumentCaptor<Consumer<Collection<VolumeUsage>>> argument = ArgumentCaptor.forClass(Consumer.class);
-        when(volumeSourceBuilder.withVolumeConsumer(argument.capture())).thenReturn(volumeSourceBuilder);
+        ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
+        when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
         quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
-        Consumer<Collection<VolumeUsage>> storageUpdateConsumer = argument.getValue();
+        VolumeObserver volumeObserver = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
 
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
@@ -176,7 +173,7 @@ class StaticQuotaCallbackTest {
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.FETCH), "unexpected state on subsequent call without storage state change");
 
         //When
-        storageUpdateConsumer.accept(List.of(newVolume(10)));
+        volumeObserver.observeVolumeUsage(List.of(newVolume(10)));
 
         //Then
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
@@ -185,33 +182,31 @@ class StaticQuotaCallbackTest {
         quotaCallback.close();
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     void quotaResetRequired() {
-        ArgumentCaptor<Consumer<Collection<VolumeUsage>>> argument = ArgumentCaptor.forClass(Consumer.class);
-        when(volumeSourceBuilder.withVolumeConsumer(argument.capture())).thenReturn(volumeSourceBuilder);
+        ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
+        when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
         quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
-        Consumer<Collection<VolumeUsage>> storageUpdateConsumer = argument.getValue();
+        VolumeObserver volumeObserver = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
 
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        storageUpdateConsumer.accept(List.of(newVolume(1)));
+        volumeObserver.observeVolumeUsage(List.of(newVolume(1)));
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
-        storageUpdateConsumer.accept(List.of(newVolume(1)));
+        volumeObserver.observeVolumeUsage(List.of(newVolume(1)));
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        storageUpdateConsumer.accept(List.of(newVolume(2)));
+        volumeObserver.observeVolumeUsage(List.of(newVolume(2)));
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 2nd storage state change");
 
         quotaCallback.close();
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     void storageCheckerMetrics() {
-        ArgumentCaptor<Consumer<Collection<VolumeUsage>>> argument = ArgumentCaptor.forClass(Consumer.class);
-        when(volumeSourceBuilder.withVolumeConsumer(argument.capture())).thenReturn(volumeSourceBuilder);
+        ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
+        when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
 
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
 
@@ -222,7 +217,7 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
         ));
 
-        argument.getValue().accept(List.of(newVolume(17)));
+        argument.getValue().observeVolumeUsage(List.of(newVolume(17)));
 
         SortedMap<MetricName, Metric> group = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "StorageChecker");
 

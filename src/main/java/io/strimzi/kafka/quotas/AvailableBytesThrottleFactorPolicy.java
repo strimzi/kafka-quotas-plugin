@@ -37,7 +37,7 @@ public class AvailableBytesThrottleFactorPolicy implements ThrottleFactorPolicy 
      * @param volumes the new collection of volumes to be considered
      */
     @Override
-    public void accept(Collection<VolumeUsage> volumes) {
+    public void observeVolumeUsage(Collection<VolumeUsage> volumes) {
         boolean initial = throttled;
         throttled = calculateNewFactor(volumes);
         if (throttled != initial) {

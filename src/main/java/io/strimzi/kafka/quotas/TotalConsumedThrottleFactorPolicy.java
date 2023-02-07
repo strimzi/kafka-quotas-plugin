@@ -8,7 +8,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
 
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Gauge;
@@ -21,7 +20,7 @@ import static io.strimzi.kafka.quotas.StaticQuotaCallback.metricName;
  * It will progressively increase the throttle factor as the usage grows between the hard and soft limits. Once the usage is greater than or equal to the hard limit the throttle factor will be {@code 0}.
  */
 @Deprecated
-public class TotalConsumedThrottleFactorPolicy implements ThrottleFactorPolicy, Consumer<Collection<VolumeUsage>> {
+public class TotalConsumedThrottleFactorPolicy implements ThrottleFactorPolicy {
 
     List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final long consumedBytesHardLimit;
@@ -61,7 +60,7 @@ public class TotalConsumedThrottleFactorPolicy implements ThrottleFactorPolicy, 
     }
 
     @Override
-    public void accept(Collection<VolumeUsage> volumes) {
+    public void observeVolumeUsage(Collection<VolumeUsage> volumes) {
         long totalConsumed = volumes.stream().mapToLong(VolumeUsage::getConsumedSpace).sum();
         long oldValue = storageUsed.getAndSet(totalConsumed);
         if (oldValue != totalConsumed) {

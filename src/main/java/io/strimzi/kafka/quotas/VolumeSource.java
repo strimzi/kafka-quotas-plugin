@@ -12,7 +12,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -36,7 +35,7 @@ import static java.util.stream.Collectors.toSet;
  */
 public class VolumeSource implements Runnable {
 
-    private final Consumer<Collection<VolumeUsage>> volumeConsumer;
+    private final VolumeObserver volumeObserver;
     private final Admin admin;
     private final int timeout;
     private final TimeUnit timeoutUnit;
@@ -45,13 +44,13 @@ public class VolumeSource implements Runnable {
 
     /**
      * @param admin          The Kafka Admin client to be used for gathering information.
-     * @param volumeConsumer the listener to be notified of the volume usage
+     * @param volumeObserver the listener to be notified of the volume usage
      * @param timeout        how long should we wait for cluster information
      * @param timeoutUnit    What unit is the timeout configured in
      */
     @SuppressFBWarnings("EI_EXPOSE_REP2") //Injecting the dependency is the right move as it can be shared
-    public VolumeSource(Admin admin, Consumer<Collection<VolumeUsage>> volumeConsumer, int timeout, TimeUnit timeoutUnit) {
-        this.volumeConsumer = volumeConsumer;
+    public VolumeSource(Admin admin, VolumeObserver volumeObserver, int timeout, TimeUnit timeoutUnit) {
+        this.volumeObserver = volumeObserver;
         this.admin = admin;
         this.timeout = timeout;
         this.timeoutUnit = timeoutUnit;
@@ -97,12 +96,14 @@ public class VolumeSource implements Runnable {
     }
 
     private void onDescribeLogDirsSuccess(Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker) {
-        final List<VolumeUsage> volumes = logDirsPerBroker.entrySet().stream()
-                .flatMap(VolumeSource::toVolumes).collect(Collectors.toUnmodifiableList());
+        final List<VolumeUsage> volumes = logDirsPerBroker.entrySet()
+                .stream()
+                .flatMap(VolumeSource::toVolumes)
+                .collect(Collectors.toUnmodifiableList());
         if (log.isDebugEnabled()) {
             log.debug("Notifying consumers of volumes: " + volumes);
         }
-        volumeConsumer.accept(volumes);
+        volumeObserver.observeVolumeUsage(volumes);
     }
 
 

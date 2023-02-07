@@ -4,9 +4,7 @@
  */
 package io.strimzi.kafka.quotas;
 
-import java.util.Collection;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -26,7 +24,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
     private final Function<StaticQuotaConfig.KafkaClientConfig, Admin> adminClientFactory;
     private Admin adminClient;
     private StaticQuotaConfig config;
-    private Consumer<Collection<VolumeUsage>> volumesConsumer;
+    private VolumeObserver volumeObserver;
 
     /**
      * Default production constructor for production usage.
@@ -67,12 +65,11 @@ public class VolumeSourceBuilder implements AutoCloseable {
     }
 
     /**
-     *
-     * @param volumesConsumer The volume consumer to register for updates.
+     * @param volumesObserver The volume consumer to register for updates.
      * @return this to allow fluent usage of the builder.
      */
-    public VolumeSourceBuilder withVolumeConsumer(Consumer<Collection<VolumeUsage>> volumesConsumer) {
-        this.volumesConsumer = volumesConsumer;
+    public VolumeSourceBuilder withVolumeObserver(VolumeObserver volumesObserver) {
+        this.volumeObserver = volumesObserver;
         return this;
     }
 
@@ -83,7 +80,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
         adminClient = adminClientFactory.apply(config.getKafkaClientConfig());
         //Timeout just before the next job will be scheduled to run to avoid tasks queuing on the client thread pool.
         final int timeout = config.getStorageCheckInterval() - 1;
-        return new VolumeSource(adminClient, volumesConsumer, timeout, TimeUnit.SECONDS);
+        return new VolumeSource(adminClient, volumeObserver, timeout, TimeUnit.SECONDS);
     }
 
     @Override

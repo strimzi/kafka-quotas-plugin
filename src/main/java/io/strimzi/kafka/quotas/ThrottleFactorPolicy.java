@@ -5,8 +5,6 @@
 
 package io.strimzi.kafka.quotas;
 
-import java.util.Collection;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -15,7 +13,7 @@ import java.util.function.Supplier;
  * Where a value of `1.0` implies no additional restriction over and above the defined quota.
  * A value of `0.0` implies that there is no quota available regardless of the defined quota.
  */
-public interface ThrottleFactorPolicy extends Supplier<Double>, Consumer<Collection<VolumeUsage>> {
+public interface ThrottleFactorPolicy extends Supplier<Double>, VolumeObserver {
     /**
      * Register a listener to be invoked when the throttle factor is changed.
      * @param listener to be executed whenever the factor is updated.

@@ -11,7 +11,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.admin.Admin;
@@ -35,7 +34,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class VolumeSourceTest {
 
-    private VolumeConsumer volumeConsumer;
+    private CapturingVolumeObserver capturingVolumeObserver;
     private VolumeSource volumeSource;
     @Mock
     private Admin admin;
@@ -46,8 +45,8 @@ class VolumeSourceTest {
 
     @BeforeEach
     void setUp() {
-        volumeConsumer = new VolumeConsumer();
-        volumeSource = new VolumeSource(admin, volumeConsumer, 1, TimeUnit.SECONDS);
+        capturingVolumeObserver = new CapturingVolumeObserver();
+        volumeSource = new VolumeSource(admin, capturingVolumeObserver, 1, TimeUnit.SECONDS);
         final DescribeClusterResult mockDescribeClusterResult = mock(DescribeClusterResult.class);
         when(mockDescribeClusterResult.nodes()).thenReturn(KafkaFuture.completedFuture(nodes));
         when(admin.describeCluster()).thenReturn(mockDescribeClusterResult);
@@ -69,7 +68,7 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();
+        final List<Collection<VolumeUsage>> results = capturingVolumeObserver.getActualResults();
         assertThat(results).hasSize(1);
         final Collection<VolumeUsage> onlyInvocation = results.get(0);
         assertThat(onlyInvocation).containsExactly(new VolumeUsage("1", "dir1", 50, 10));
@@ -87,7 +86,7 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();
+        final List<Collection<VolumeUsage>> results = capturingVolumeObserver.getActualResults();
         assertThat(results).hasSize(1);
         final Collection<VolumeUsage> onlyInvocation = results.get(0);
         VolumeUsage expected1 = new VolumeUsage("1", "dir1", 50, 10);
@@ -110,7 +109,7 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();
+        final List<Collection<VolumeUsage>> results = capturingVolumeObserver.getActualResults();
         assertThat(results).hasSize(1);
         final Collection<VolumeUsage> onlyInvocation = results.get(0);
         VolumeUsage expected1 = new VolumeUsage("1", "dir1", 50, 10);
@@ -127,17 +126,17 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();
+        final List<Collection<VolumeUsage>> results = capturingVolumeObserver.getActualResults();
         assertThat(results).hasSize(1);
         final Collection<VolumeUsage> onlyInvocation = results.get(0);
         assertThat(onlyInvocation).isEmpty();
     }
 
-    private static class VolumeConsumer implements Consumer<Collection<VolumeUsage>> {
+    private static class CapturingVolumeObserver implements VolumeObserver {
         private final List<Collection<VolumeUsage>> actualResults = new ArrayList<>();
 
         @Override
-        public void accept(Collection<VolumeUsage> volumes) {
+        public void observeVolumeUsage(Collection<VolumeUsage> volumes) {
             actualResults.add(volumes);
         }
 

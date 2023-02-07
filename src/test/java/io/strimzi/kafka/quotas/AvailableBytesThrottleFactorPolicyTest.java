@@ -52,7 +52,7 @@ class AvailableBytesThrottleFactorPolicyTest {
         verify(updateListener, times(1)).run();
 
         //When
-        availableBytesThrottleFactorSupplier.accept(List.of(volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT)));
+        availableBytesThrottleFactorSupplier.observeVolumeUsage(List.of(volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT)));
 
         //Then
         verify(updateListener, times(2)).run();
@@ -63,10 +63,10 @@ class AvailableBytesThrottleFactorPolicyTest {
         //Given
         availableBytesThrottleFactorSupplier.addUpdateListener(updateListener);
         verify(updateListener, times(1)).run();
-        availableBytesThrottleFactorSupplier.accept(List.of(volumeWithAvailableBytes(900L)));
+        availableBytesThrottleFactorSupplier.observeVolumeUsage(List.of(volumeWithAvailableBytes(900L)));
 
         //When
-        availableBytesThrottleFactorSupplier.accept(List.of(volumeWithAvailableBytes(900L)));
+        availableBytesThrottleFactorSupplier.observeVolumeUsage(List.of(volumeWithAvailableBytes(900L)));
 
         //Then
         verify(updateListener, times(1)).run();
@@ -75,7 +75,7 @@ class AvailableBytesThrottleFactorPolicyTest {
     @Test
     void shouldNotifyListenerOfFactorOnAdd() {
         //Given
-        availableBytesThrottleFactorSupplier.accept(List.of(volumeWithAvailableBytes(900L)));
+        availableBytesThrottleFactorSupplier.observeVolumeUsage(List.of(volumeWithAvailableBytes(900L)));
 
         //When
         availableBytesThrottleFactorSupplier.addUpdateListener(updateListener);
@@ -89,7 +89,7 @@ class AvailableBytesThrottleFactorPolicyTest {
         //Given
 
         //When
-        availableBytesThrottleFactorSupplier.accept(List.of(volumeWithAvailableBytes(1000L)));
+        availableBytesThrottleFactorSupplier.observeVolumeUsage(List.of(volumeWithAvailableBytes(1000L)));
 
         //Then
         assertThrottleFactor(1.0);
@@ -100,7 +100,7 @@ class AvailableBytesThrottleFactorPolicyTest {
         //Given
 
         //When
-        availableBytesThrottleFactorSupplier.accept(List.of(volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT)));
+        availableBytesThrottleFactorSupplier.observeVolumeUsage(List.of(volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT)));
 
         //Then
         assertThrottleFactor(0.0d);
@@ -112,7 +112,7 @@ class AvailableBytesThrottleFactorPolicyTest {
         //Given
 
         //When
-        availableBytesThrottleFactorSupplier.accept(List.of(volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT - 1)));
+        availableBytesThrottleFactorSupplier.observeVolumeUsage(List.of(volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT - 1)));
 
         //Then
         assertThrottleFactor(0.0d);
@@ -123,7 +123,7 @@ class AvailableBytesThrottleFactorPolicyTest {
         //Given
 
         //When
-        availableBytesThrottleFactorSupplier.accept(List.of(volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT + 10),
+        availableBytesThrottleFactorSupplier.observeVolumeUsage(List.of(volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT + 10),
                 volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT - 1)));
 
         //Then
