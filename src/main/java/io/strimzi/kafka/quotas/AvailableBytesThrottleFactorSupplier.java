@@ -37,7 +37,7 @@ public class AvailableBytesThrottleFactorSupplier implements ThrottleFactorSuppl
      * @param volumes the new collection of volumes to be considered
      */
     @Override
-    public void accept(Collection<Volume> volumes) {
+    public void accept(Collection<VolumeUsage> volumes) {
         boolean initial = throttled;
         throttled = calculateNewFactor(volumes);
         if (throttled != initial) {
@@ -46,7 +46,7 @@ public class AvailableBytesThrottleFactorSupplier implements ThrottleFactorSuppl
         }
     }
 
-    private boolean calculateNewFactor(Collection<Volume> volumes) {
+    private boolean calculateNewFactor(Collection<VolumeUsage> volumes) {
         return volumes.stream().anyMatch(volume -> volume.getAvailableBytes() <= availableBytesLimit);
     }
 

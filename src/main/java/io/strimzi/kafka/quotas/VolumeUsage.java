@@ -10,7 +10,7 @@ import java.util.Objects;
 /**
  * Represents a single volume on a specific Kafka broker.
  */
-public class Volume {
+public class VolumeUsage {
     private final String brokerId;
     private final String logDir;
     private final long capacity;
@@ -23,7 +23,7 @@ public class Volume {
      * @param capacity How many bytes the volume holds
      * @param availableBytes How many available bytes remain on the volume.
      */
-    public Volume(String brokerId, String logDir, long capacity, long availableBytes) {
+    public VolumeUsage(String brokerId, String logDir, long capacity, long availableBytes) {
         this.brokerId = brokerId;
         this.logDir = logDir;
         this.capacity = capacity;
@@ -73,8 +73,8 @@ public class Volume {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Volume volume = (Volume) o;
-        return capacity == volume.capacity && availableBytes == volume.availableBytes && Objects.equals(brokerId, volume.brokerId) && Objects.equals(logDir, volume.logDir);
+        VolumeUsage volumeUsage = (VolumeUsage) o;
+        return capacity == volumeUsage.capacity && availableBytes == volumeUsage.availableBytes && Objects.equals(brokerId, volumeUsage.brokerId) && Objects.equals(logDir, volumeUsage.logDir);
     }
 
     @Override

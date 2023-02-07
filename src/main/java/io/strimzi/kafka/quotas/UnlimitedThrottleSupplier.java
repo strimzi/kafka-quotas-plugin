@@ -30,7 +30,7 @@ public class UnlimitedThrottleSupplier implements ThrottleFactorSupplier {
     }
 
     @Override
-    public void accept(Collection<Volume> volumes) {
+    public void accept(Collection<VolumeUsage> volumes) {
         //Shrug. Update all you like I won't change my mind
     }
 }

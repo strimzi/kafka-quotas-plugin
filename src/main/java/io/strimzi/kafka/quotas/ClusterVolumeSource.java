@@ -33,7 +33,7 @@ import static java.util.stream.Collectors.toSet;
  */
 public class ClusterVolumeSource implements Runnable {
 
-    private final Consumer<Collection<Volume>> volumeConsumer;
+    private final Consumer<Collection<VolumeUsage>> volumeConsumer;
     private final Admin admin;
 
     private static final Logger log = LoggerFactory.getLogger(ClusterVolumeSource.class);
@@ -43,7 +43,7 @@ public class ClusterVolumeSource implements Runnable {
      * @param volumeConsumer the listener to be notified of the volume usage.
      */
     @SuppressFBWarnings("EI_EXPOSE_REP2") //Injecting the dependency is the right move as it can be shared
-    public ClusterVolumeSource(Admin admin, Consumer<Collection<Volume>> volumeConsumer) {
+    public ClusterVolumeSource(Admin admin, Consumer<Collection<VolumeUsage>> volumeConsumer) {
         this.volumeConsumer = volumeConsumer;
         this.admin = admin;
     }
@@ -80,7 +80,7 @@ public class ClusterVolumeSource implements Runnable {
     }
 
     private void onDescribeLogDirsSuccess(Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker) {
-        final List<Volume> volumes = logDirsPerBroker.entrySet().stream()
+        final List<VolumeUsage> volumes = logDirsPerBroker.entrySet().stream()
                 .flatMap(ClusterVolumeSource::toVolumes).collect(Collectors.toUnmodifiableList());
         if (log.isDebugEnabled()) {
             log.debug("Notifying consumers of volumes: " + volumes);
@@ -89,12 +89,12 @@ public class ClusterVolumeSource implements Runnable {
     }
 
 
-    private static Stream<? extends Volume> toVolumes(Map.Entry<Integer, Map<String, LogDirDescription>> brokerIdToLogDirs) {
+    private static Stream<? extends VolumeUsage> toVolumes(Map.Entry<Integer, Map<String, LogDirDescription>> brokerIdToLogDirs) {
         return brokerIdToLogDirs.getValue().entrySet().stream().map(logDirs -> {
             LogDirDescription logDirDescription = logDirs.getValue();
             final long totalBytes = logDirDescription.totalBytes().orElse(0);
             final long usableBytes = logDirDescription.usableBytes().orElse(0);
-            return new Volume("" + brokerIdToLogDirs.getKey(), logDirs.getKey(), totalBytes, usableBytes);
+            return new VolumeUsage("" + brokerIdToLogDirs.getKey(), logDirs.getKey(), totalBytes, usableBytes);
         });
     }
 

@@ -25,7 +25,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
     private final Function<StaticQuotaConfig.KafkaClientConfig, Admin> adminClientFactory;
     private Admin adminClient;
     private StaticQuotaConfig config;
-    private Consumer<Collection<Volume>> volumesConsumer;
+    private Consumer<Collection<VolumeUsage>> volumesConsumer;
 
     /**
      * Default production constructor for production usage.
@@ -70,7 +70,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
      * @param volumesConsumer The volume consumer to register for updates.
      * @return this to allow fluent usage of the builder.
      */
-    public VolumeSourceBuilder withVolumeConsumer(Consumer<Collection<Volume>> volumesConsumer) {
+    public VolumeSourceBuilder withVolumeConsumer(Consumer<Collection<VolumeUsage>> volumesConsumer) {
         this.volumesConsumer = volumesConsumer;
         return this;
     }

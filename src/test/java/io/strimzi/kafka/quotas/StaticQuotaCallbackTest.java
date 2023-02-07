@@ -47,8 +47,8 @@ class StaticQuotaCallbackTest {
     @Mock(lenient = true)
     VolumeSourceBuilder volumeSourceBuilder;
 
-    private static Volume newVolume(int consumedSpace) {
-        return new Volume("-1", "test", 50, 50 - consumedSpace);
+    private static VolumeUsage newVolume(int consumedSpace) {
+        return new VolumeUsage("-1", "test", 50, 50 - consumedSpace);
     }
 
     StaticQuotaCallback target;
@@ -161,11 +161,11 @@ class StaticQuotaCallbackTest {
     @SuppressWarnings("unchecked")
     @Test
     void quotaResetRequiredShouldRespectQuotaType() {
-        ArgumentCaptor<Consumer<Collection<Volume>>> argument = ArgumentCaptor.forClass(Consumer.class);
+        ArgumentCaptor<Consumer<Collection<VolumeUsage>>> argument = ArgumentCaptor.forClass(Consumer.class);
         when(volumeSourceBuilder.withVolumeConsumer(argument.capture())).thenReturn(volumeSourceBuilder);
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
         quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
-        Consumer<Collection<Volume>> storageUpdateConsumer = argument.getValue();
+        Consumer<Collection<VolumeUsage>> storageUpdateConsumer = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
 
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
@@ -187,11 +187,11 @@ class StaticQuotaCallbackTest {
     @SuppressWarnings("unchecked")
     @Test
     void quotaResetRequired() {
-        ArgumentCaptor<Consumer<Collection<Volume>>> argument = ArgumentCaptor.forClass(Consumer.class);
+        ArgumentCaptor<Consumer<Collection<VolumeUsage>>> argument = ArgumentCaptor.forClass(Consumer.class);
         when(volumeSourceBuilder.withVolumeConsumer(argument.capture())).thenReturn(volumeSourceBuilder);
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
         quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
-        Consumer<Collection<Volume>> storageUpdateConsumer = argument.getValue();
+        Consumer<Collection<VolumeUsage>> storageUpdateConsumer = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
 
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
@@ -209,7 +209,7 @@ class StaticQuotaCallbackTest {
     @SuppressWarnings("unchecked")
     @Test
     void storageCheckerMetrics() {
-        ArgumentCaptor<Consumer<Collection<Volume>>> argument = ArgumentCaptor.forClass(Consumer.class);
+        ArgumentCaptor<Consumer<Collection<VolumeUsage>>> argument = ArgumentCaptor.forClass(Consumer.class);
         when(volumeSourceBuilder.withVolumeConsumer(argument.capture())).thenReturn(volumeSourceBuilder);
 
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);

@@ -32,7 +32,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ClusterVolumeSourceTest {
+public class ClusterVolumeSourceTest {
 
     private VolumeConsumer volumeConsumer;
     private ClusterVolumeSource clusterVolumeSource;
@@ -68,10 +68,10 @@ class ClusterVolumeSourceTest {
         clusterVolumeSource.run();
 
         //Then
-        final List<Collection<Volume>> results = volumeConsumer.getActualResults();
+        final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();
         assertThat(results).hasSize(1);
-        final Collection<Volume> onlyInvocation = results.get(0);
-        assertThat(onlyInvocation).containsExactly(new Volume("1", "dir1", 50, 10));
+        final Collection<VolumeUsage> onlyInvocation = results.get(0);
+        assertThat(onlyInvocation).containsExactly(new VolumeUsage("1", "dir1", 50, 10));
     }
 
     @Test
@@ -86,11 +86,11 @@ class ClusterVolumeSourceTest {
         clusterVolumeSource.run();
 
         //Then
-        final List<Collection<Volume>> results = volumeConsumer.getActualResults();
+        final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();
         assertThat(results).hasSize(1);
-        final Collection<Volume> onlyInvocation = results.get(0);
-        Volume expected1 = new Volume("1", "dir1", 50, 10);
-        Volume expected2 = new Volume("1", "dir2", 30, 5);
+        final Collection<VolumeUsage> onlyInvocation = results.get(0);
+        VolumeUsage expected1 = new VolumeUsage("1", "dir1", 50, 10);
+        VolumeUsage expected2 = new VolumeUsage("1", "dir2", 30, 5);
         assertThat(onlyInvocation).containsExactlyInAnyOrder(expected1, expected2);
     }
 
@@ -109,11 +109,11 @@ class ClusterVolumeSourceTest {
         clusterVolumeSource.run();
 
         //Then
-        final List<Collection<Volume>> results = volumeConsumer.getActualResults();
+        final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();
         assertThat(results).hasSize(1);
-        final Collection<Volume> onlyInvocation = results.get(0);
-        Volume expected1 = new Volume("1", "dir1", 50, 10);
-        Volume expected2 = new Volume("2", "dir1", 30, 5);
+        final Collection<VolumeUsage> onlyInvocation = results.get(0);
+        VolumeUsage expected1 = new VolumeUsage("1", "dir1", 50, 10);
+        VolumeUsage expected2 = new VolumeUsage("2", "dir1", 30, 5);
         assertThat(onlyInvocation).containsExactlyInAnyOrder(expected1, expected2);
     }
 
@@ -126,21 +126,21 @@ class ClusterVolumeSourceTest {
         clusterVolumeSource.run();
 
         //Then
-        final List<Collection<Volume>> results = volumeConsumer.getActualResults();
+        final List<Collection<VolumeUsage>> results = volumeConsumer.getActualResults();
         assertThat(results).hasSize(1);
-        final Collection<Volume> onlyInvocation = results.get(0);
+        final Collection<VolumeUsage> onlyInvocation = results.get(0);
         assertThat(onlyInvocation).isEmpty();
     }
 
-    private static class VolumeConsumer implements Consumer<Collection<Volume>> {
-        private final List<Collection<Volume>> actualResults = new ArrayList<>();
+    private static class VolumeConsumer implements Consumer<Collection<VolumeUsage>> {
+        private final List<Collection<VolumeUsage>> actualResults = new ArrayList<>();
 
         @Override
-        public void accept(Collection<Volume> volumes) {
+        public void accept(Collection<VolumeUsage> volumes) {
             actualResults.add(volumes);
         }
 
-        public List<Collection<Volume>> getActualResults() {
+        public List<Collection<VolumeUsage>> getActualResults() {
             return actualResults;
         }
     }

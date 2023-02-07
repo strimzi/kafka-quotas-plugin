@@ -134,7 +134,7 @@ class AvailableBytesThrottleFactorSupplierTest {
         Assertions.assertThat(availableBytesThrottleFactorSupplier.get()).isCloseTo(expected, Offset.offset(0.00001));
     }
 
-    private static Volume volumeWithAvailableBytes(long availableBytes) {
-        return new Volume("0", "/var/lib/data", 1000L, availableBytes);
+    private static VolumeUsage volumeWithAvailableBytes(long availableBytes) {
+        return new VolumeUsage("0", "/var/lib/data", 1000L, availableBytes);
     }
 }

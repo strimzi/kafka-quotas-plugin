@@ -21,7 +21,7 @@ import static io.strimzi.kafka.quotas.StaticQuotaCallback.metricName;
  * It will progressively increase the throttle factor as the usage grows between the hard and soft limits. Once the usage is greater than or equal to the hard limit the throttle factor will be {@code 0}.
  */
 @Deprecated
-public class TotalConsumedThrottleFactorSupplier implements ThrottleFactorSupplier, Consumer<Collection<Volume>> {
+public class TotalConsumedThrottleFactorSupplier implements ThrottleFactorSupplier, Consumer<Collection<VolumeUsage>> {
 
     List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final long consumedBytesHardLimit;
@@ -61,8 +61,8 @@ public class TotalConsumedThrottleFactorSupplier implements ThrottleFactorSuppli
     }
 
     @Override
-    public void accept(Collection<Volume> volumes) {
-        long totalConsumed = volumes.stream().mapToLong(Volume::getConsumedSpace).sum();
+    public void accept(Collection<VolumeUsage> volumes) {
+        long totalConsumed = volumes.stream().mapToLong(VolumeUsage::getConsumedSpace).sum();
         long oldValue = storageUsed.getAndSet(totalConsumed);
         if (oldValue != totalConsumed) {
             if (totalConsumed >= consumedBytesHardLimit) {
