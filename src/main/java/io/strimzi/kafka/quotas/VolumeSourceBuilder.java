@@ -5,6 +5,7 @@
 package io.strimzi.kafka.quotas;
 
 import java.util.Collection;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -80,7 +81,9 @@ public class VolumeSourceBuilder implements AutoCloseable {
             throw new IllegalStateException("KIP-827 not available, this plugin requires broker version >= 3.3");
         }
         adminClient = adminClientFactory.apply(config.getKafkaClientConfig());
-        return new VolumeSource(adminClient, volumesConsumer);
+        //Timeout just before the next job will be scheduled to run to avoid tasks queuing on the client thread pool.
+        final int timeout = config.getStorageCheckInterval() - 100;
+        return new VolumeSource(adminClient, volumesConsumer, timeout, TimeUnit.MILLISECONDS);
     }
 
     @Override

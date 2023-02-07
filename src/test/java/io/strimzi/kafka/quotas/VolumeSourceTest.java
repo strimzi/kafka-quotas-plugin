@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -46,7 +47,7 @@ class VolumeSourceTest {
     @BeforeEach
     void setUp() {
         volumeConsumer = new VolumeConsumer();
-        volumeSource = new VolumeSource(admin, volumeConsumer);
+        volumeSource = new VolumeSource(admin, volumeConsumer, 1, TimeUnit.SECONDS);
         final DescribeClusterResult mockDescribeClusterResult = mock(DescribeClusterResult.class);
         when(mockDescribeClusterResult.nodes()).thenReturn(KafkaFuture.completedFuture(nodes));
         when(admin.describeCluster()).thenReturn(mockDescribeClusterResult);

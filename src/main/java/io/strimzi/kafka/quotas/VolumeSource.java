@@ -9,6 +9,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -35,33 +38,47 @@ public class VolumeSource implements Runnable {
 
     private final Consumer<Collection<VolumeUsage>> volumeConsumer;
     private final Admin admin;
+    private final int timeout;
+    private final TimeUnit timeoutUnit;
 
     private static final Logger log = LoggerFactory.getLogger(VolumeSource.class);
 
     /**
-     * @param admin The Kafka Admin client to be used for gathering inf
-     * @param volumeConsumer the listener to be notified of the volume usage.
+     * @param admin          The Kafka Admin client to be used for gathering information.
+     * @param volumeConsumer the listener to be notified of the volume usage
+     * @param timeout        how long should we wait for cluster information
+     * @param timeoutUnit    What unit is the timeout configured in
      */
     @SuppressFBWarnings("EI_EXPOSE_REP2") //Injecting the dependency is the right move as it can be shared
-    public VolumeSource(Admin admin, Consumer<Collection<VolumeUsage>> volumeConsumer) {
+    public VolumeSource(Admin admin, Consumer<Collection<VolumeUsage>> volumeConsumer, int timeout, TimeUnit timeoutUnit) {
         this.volumeConsumer = volumeConsumer;
         this.admin = admin;
+        this.timeout = timeout;
+        this.timeoutUnit = timeoutUnit;
     }
 
     @Override
     public void run() {
         log.debug("Attempting to describe cluster");
         final DescribeClusterResult clusterResult = admin.describeCluster();
-        clusterResult.nodes().whenComplete((nodes, throwable) -> {
-            if (throwable != null) {
-                log.error("error while describing cluster", throwable);
-            } else {
-                if (log.isDebugEnabled()) {
-                    log.debug("Successfully described cluster: " + nodes);
+        try {
+            clusterResult.nodes().whenComplete((nodes, throwable) -> {
+                if (throwable != null) {
+                    log.error("error while describing cluster", throwable);
+                } else {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Successfully described cluster: " + nodes);
+                    }
+                    onClusterDescribeSuccess(nodes);
                 }
-                onClusterDescribeSuccess(nodes);
-            }
-        });
+            }).get(timeout, timeoutUnit);
+        } catch (InterruptedException e) {
+            log.warn("Caught interrupt exception trying to describe cluster: {}", e.getMessage(), e);
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException | TimeoutException e) {
+            log.warn("Caught exception trying to describe cluster: {}", e.getMessage(), e);
+            //TODO should we cancel the futures here (specifically in the event of a timeout)?
+        }
     }
 
     private void onClusterDescribeSuccess(Collection<Node> nodes) {
