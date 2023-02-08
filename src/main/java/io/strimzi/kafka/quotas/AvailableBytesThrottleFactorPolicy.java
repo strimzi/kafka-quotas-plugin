@@ -51,7 +51,7 @@ public class AvailableBytesThrottleFactorPolicy implements ThrottleFactorPolicy 
     }
 
     @Override
-    public Double get() {
+    public Double currentFactor() {
         return throttled ? 0.0 : 1.0;
     }
 

@@ -55,7 +55,7 @@ public class TotalConsumedThrottleFactorPolicy implements ThrottleFactorPolicy {
     }
 
     @Override
-    public Double get() {
+    public Double currentFactor() {
         return throttleFactor;
     }
 

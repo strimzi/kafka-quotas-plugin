@@ -131,7 +131,7 @@ class AvailableBytesThrottleFactorPolicyTest {
     }
 
     private void assertThrottleFactor(double expected) {
-        Assertions.assertThat(availableBytesThrottleFactorSupplier.get()).isCloseTo(expected, Offset.offset(0.00001));
+        Assertions.assertThat(availableBytesThrottleFactorSupplier.currentFactor()).isCloseTo(expected, Offset.offset(0.00001));
     }
 
     private static VolumeUsage volumeWithAvailableBytes(long availableBytes) {

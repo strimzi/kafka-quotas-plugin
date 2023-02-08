@@ -5,19 +5,22 @@
 
 package io.strimzi.kafka.quotas;
 
-import java.util.function.Supplier;
-
 /**
  * Determines the current restriction factor to be applied to the client quota.
  * Values returned are required to be in the range <code>0.0..1.0</code> inclusive.
  * Where a value of `1.0` implies no additional restriction over and above the defined quota.
  * A value of `0.0` implies that there is no quota available regardless of the defined quota.
  */
-public interface ThrottleFactorPolicy extends Supplier<Double>, VolumeObserver {
+public interface ThrottleFactorPolicy extends VolumeObserver {
     /**
      * Register a listener to be invoked when the throttle factor is changed.
      * @param listener to be executed whenever the factor is updated.
      */
     void addUpdateListener(Runnable listener);
+
+    /**
+     * @return The current factor in the range {@code [0..1]} to scale the throttle by.
+     */
+    Double currentFactor();
 
 }

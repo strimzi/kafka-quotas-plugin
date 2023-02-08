@@ -91,7 +91,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         double quota = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
 
         if (ClientQuotaType.PRODUCE.equals(quotaType)) {
-            return quota * throttleFactorPolicy.get();
+            return quota * throttleFactorPolicy.currentFactor();
         } else {
             return quota;
         }

@@ -73,7 +73,7 @@ class TotalConsumedThrottleFactorPolicyTest {
     @Test
     public void testHardLimitViolation() {
         throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 100L)));
-        Double throttleFactor = throttleFactorPolicy.get();
+        Double throttleFactor = throttleFactorPolicy.currentFactor();
         Assertions.assertThat(throttleFactor).isCloseTo(0.0, Offset.offset(0.00001d));
     }
 
@@ -81,7 +81,7 @@ class TotalConsumedThrottleFactorPolicyTest {
     public void testSoftLimitViolation() {
         TotalConsumedThrottleFactorPolicy supplier = new TotalConsumedThrottleFactorPolicy(900L, 800L);
         supplier.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 150L)));
-        Double throttleFactor = supplier.get();
+        Double throttleFactor = supplier.currentFactor();
         Assertions.assertThat(throttleFactor).isCloseTo(0.5, Offset.offset(0.00001d));
     }
 
@@ -89,7 +89,7 @@ class TotalConsumedThrottleFactorPolicyTest {
     public void testSoftLimitViolationLowerBound() {
         TotalConsumedThrottleFactorPolicy supplier = new TotalConsumedThrottleFactorPolicy(900L, 800L);
         supplier.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 199L)));
-        Double throttleFactor = supplier.get();
+        Double throttleFactor = supplier.currentFactor();
         Assertions.assertThat(throttleFactor).isCloseTo(0.99, Offset.offset(0.00001d));
     }
 
@@ -97,7 +97,7 @@ class TotalConsumedThrottleFactorPolicyTest {
     public void testSoftLimitViolationUpperBound() {
         TotalConsumedThrottleFactorPolicy supplier = new TotalConsumedThrottleFactorPolicy(900L, 800L);
         supplier.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 101L)));
-        Double throttleFactor = supplier.get();
+        Double throttleFactor = supplier.currentFactor();
         Assertions.assertThat(throttleFactor).isCloseTo(0.01, Offset.offset(0.00001d));
     }
 
@@ -105,7 +105,7 @@ class TotalConsumedThrottleFactorPolicyTest {
     public void testHardLimitViolationAcrossMultipleVolumes() {
         throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 50L),
                 new VolumeUsage("1", "/dir2", 1000L, 50L)));
-        Double throttleFactor = throttleFactorPolicy.get();
+        Double throttleFactor = throttleFactorPolicy.currentFactor();
         Assertions.assertThat(throttleFactor).isCloseTo(0.0, Offset.offset(0.00001d));
     }
 
@@ -113,13 +113,13 @@ class TotalConsumedThrottleFactorPolicyTest {
     public void testHardLimitViolationRecovery() {
         throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 100L)));
         throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 1000L)));
-        Double throttleFactor = throttleFactorPolicy.get();
+        Double throttleFactor = throttleFactorPolicy.currentFactor();
         Assertions.assertThat(throttleFactor).isCloseTo(1.0, Offset.offset(0.00001d));
     }
 
     @Test
     public void testThrottleFactorDefaultsToOpen() {
-        Double throttleFactor = throttleFactorPolicy.get();
+        Double throttleFactor = throttleFactorPolicy.currentFactor();
         Assertions.assertThat(throttleFactor).isCloseTo(1.0, Offset.offset(0.00001d));
     }
 
