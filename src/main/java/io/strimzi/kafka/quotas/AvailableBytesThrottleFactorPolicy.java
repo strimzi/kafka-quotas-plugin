@@ -39,14 +39,14 @@ public class AvailableBytesThrottleFactorPolicy implements ThrottleFactorPolicy 
     @Override
     public void observeVolumeUsage(Collection<VolumeUsage> volumes) {
         boolean initial = throttled;
-        throttled = calculateNewFactor(volumes);
+        throttled = shouldThrottle(volumes);
         if (throttled != initial) {
             log.debug("throttle status changed from: {} to {} on update", initial, throttled);
             listeners.forEach(Runnable::run);
         }
     }
 
-    private boolean calculateNewFactor(Collection<VolumeUsage> volumes) {
+    private boolean shouldThrottle(Collection<VolumeUsage> volumes) {
         return volumes.stream().anyMatch(volume -> volume.getAvailableBytes() <= availableBytesLimit);
     }
 
