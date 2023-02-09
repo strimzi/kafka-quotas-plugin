@@ -55,7 +55,7 @@ public class TotalConsumedThrottleFactorPolicy implements ThrottleFactorPolicy {
     }
 
     @Override
-    public Double currentFactor() {
+    public double currentFactor() {
         return throttleFactor;
     }
 
@@ -76,6 +76,7 @@ public class TotalConsumedThrottleFactorPolicy implements ThrottleFactorPolicy {
             }
         }
     }
+
     private static class StaticLongGauge extends Gauge<Long> {
         private final Long value;
 

@@ -21,6 +21,6 @@ public interface ThrottleFactorPolicy extends VolumeObserver {
     /**
      * @return The current factor in the range {@code [0..1]} to scale the throttle by.
      */
-    Double currentFactor();
+    double currentFactor();
 
 }

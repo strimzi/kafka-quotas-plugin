@@ -20,7 +20,7 @@ public class UnlimitedThrottleSupplier implements ThrottleFactorPolicy {
     private UnlimitedThrottleSupplier() {
     }
     @Override
-    public Double currentFactor() {
+    public double currentFactor() {
         return 1.0;
     }
 
