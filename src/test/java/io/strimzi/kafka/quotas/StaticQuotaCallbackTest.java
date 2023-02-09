@@ -134,7 +134,7 @@ class StaticQuotaCallbackTest {
     void shouldNotScheduleStorageCheckWhenCheckIntervalIsNotProvided() {
         //Given
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(StaticQuotaCallbackTest.this.volumeSourceBuilder, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
 
         //When
         target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
@@ -147,7 +147,7 @@ class StaticQuotaCallbackTest {
     void shouldShutdownExecutorOnClose() {
         //Given
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(StaticQuotaCallbackTest.this.volumeSourceBuilder, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
         target.configure(MINIMUM_EXECUTABLE_CONFIG);
 
         //When
