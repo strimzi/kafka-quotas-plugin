@@ -9,7 +9,8 @@ import java.util.Objects;
 
 
 /**
- *
+ * Converts volume usage to a throttle factor by applying a {@link ThrottleFactorPolicy} to the observations.
+ * Notifies a listener when the factor changes.
  */
 public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource {
 

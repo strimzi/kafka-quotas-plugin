@@ -6,7 +6,7 @@
 package io.strimzi.kafka.quotas;
 
 /**
- *
+ * Provides the currently applicable throttle factor.
  */
 public interface ThrottleFactorSource {
     /**
