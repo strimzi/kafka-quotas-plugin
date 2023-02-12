@@ -87,15 +87,12 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         if (Boolean.TRUE.toString().equals(metricTags.get(EXCLUDED_PRINCIPAL_QUOTA_KEY))) {
             return Quota.upperBound(Double.MAX_VALUE).bound();
         }
-
-        // Don't allow producing messages if we're beyond the storage limit.
         double quota = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
-
         if (ClientQuotaType.PRODUCE.equals(quotaType)) {
-            return quota * throttleFactorSource.currentThrottleFactor();
-        } else {
-            return quota;
+            quota = quota * throttleFactorSource.currentThrottleFactor();
         }
+        // returning zero would cause a divide by zero in Kafka so we return 1 at minimum
+        return Math.max(quota, 1d);
     }
 
     @Override

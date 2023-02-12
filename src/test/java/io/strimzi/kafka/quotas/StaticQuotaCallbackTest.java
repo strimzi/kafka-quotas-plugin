@@ -27,6 +27,8 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.offset;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -88,6 +90,28 @@ class StaticQuotaCallbackTest {
 
         double quotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(1024, quotaLimit);
+    }
+
+    @Test
+    void shouldNotThrottleToZeroBytes() {
+        //Given
+        ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
+        when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
+
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
+
+        quotaCallback.configure(Map.of(
+                StaticQuotaConfig.AVAILABLE_BYTES_PROP, 15L,
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10,
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
+        ));
+
+        //When
+        argument.getValue().observeVolumeUsage(List.of(newVolume(10L)));
+
+        //Then
+        double quotaLimit = quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of());
+        assertThat(quotaLimit).isCloseTo(1.0, offset(0.00001d));
     }
 
     @Test
