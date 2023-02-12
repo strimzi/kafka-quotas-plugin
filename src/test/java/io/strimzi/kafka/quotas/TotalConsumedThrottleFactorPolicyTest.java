@@ -20,15 +20,12 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 @SuppressWarnings("deprecation")
 class TotalConsumedThrottleFactorPolicyTest {
 
     private static final String METRIC_SCOPE = "io.strimzi.kafka.quotas.StaticQuotaCallback";
+    private static final Offset<Double> OFFSET = Offset.offset(0.00001d);
     private TotalConsumedThrottleFactorPolicy throttleFactorPolicy;
 
     @AfterEach
@@ -42,85 +39,38 @@ class TotalConsumedThrottleFactorPolicyTest {
     }
 
     @Test
-    public void testListenersNotifiedOnChange() {
-        Runnable runnable = mock(Runnable.class);
-        throttleFactorPolicy.addUpdateListener(runnable);
-        throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 100L)));
-        verify(runnable).run();
-    }
-
-    @Test
-    public void testListenerNotNotifiedIfTotalConsumedUnchanged() {
-        Runnable runnable = mock(Runnable.class);
-        throttleFactorPolicy.addUpdateListener(runnable);
-        throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 100L)));
-        verify(runnable).run();
-        throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 100L)));
-        verifyNoMoreInteractions(runnable);
-    }
-
-    @Test
-    public void testListenerNotifiedIfTotalConsumedChanged() {
-        Runnable runnable = mock(Runnable.class);
-        throttleFactorPolicy.addUpdateListener(runnable);
-        throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 100L)));
-        verify(runnable).run();
-        throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 50L)));
-        verify(runnable, times(2)).run();
-        verifyNoMoreInteractions(runnable);
-    }
-
-    @Test
     public void testHardLimitViolation() {
-        throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 100L)));
-        Double throttleFactor = throttleFactorPolicy.currentFactor();
-        Assertions.assertThat(throttleFactor).isCloseTo(0.0, Offset.offset(0.00001d));
+        Double throttleFactor = throttleFactorPolicy.calculateFactor(List.of(new VolumeUsage("1", "/dir", 1000L, 100L)));
+
+        Assertions.assertThat(throttleFactor).isCloseTo(0.0, OFFSET);
     }
 
     @Test
     public void testSoftLimitViolation() {
-        TotalConsumedThrottleFactorPolicy supplier = new TotalConsumedThrottleFactorPolicy(900L, 800L);
-        supplier.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 150L)));
-        Double throttleFactor = supplier.currentFactor();
-        Assertions.assertThat(throttleFactor).isCloseTo(0.5, Offset.offset(0.00001d));
+        final TotalConsumedThrottleFactorPolicy factorPolicy = new TotalConsumedThrottleFactorPolicy(900L, 800L);
+        Double throttleFactor = factorPolicy.calculateFactor(List.of(new VolumeUsage("1", "/dir", 1000L, 150L)));
+        Assertions.assertThat(throttleFactor).isCloseTo(0.5, OFFSET);
     }
 
     @Test
     public void testSoftLimitViolationLowerBound() {
-        TotalConsumedThrottleFactorPolicy supplier = new TotalConsumedThrottleFactorPolicy(900L, 800L);
-        supplier.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 199L)));
-        Double throttleFactor = supplier.currentFactor();
-        Assertions.assertThat(throttleFactor).isCloseTo(0.99, Offset.offset(0.00001d));
+        TotalConsumedThrottleFactorPolicy factorPolicy = new TotalConsumedThrottleFactorPolicy(900L, 800L);
+        Double throttleFactor = factorPolicy.calculateFactor(List.of(new VolumeUsage("1", "/dir", 1000L, 199L)));
+        Assertions.assertThat(throttleFactor).isCloseTo(0.99, OFFSET);
     }
 
     @Test
     public void testSoftLimitViolationUpperBound() {
-        TotalConsumedThrottleFactorPolicy supplier = new TotalConsumedThrottleFactorPolicy(900L, 800L);
-        supplier.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 101L)));
-        Double throttleFactor = supplier.currentFactor();
-        Assertions.assertThat(throttleFactor).isCloseTo(0.01, Offset.offset(0.00001d));
+        TotalConsumedThrottleFactorPolicy factorPolicy = new TotalConsumedThrottleFactorPolicy(900L, 800L);
+        Double throttleFactor = factorPolicy.calculateFactor(List.of(new VolumeUsage("1", "/dir", 1000L, 101L)));
+        Assertions.assertThat(throttleFactor).isCloseTo(0.01, OFFSET);
     }
 
     @Test
     public void testHardLimitViolationAcrossMultipleVolumes() {
-        throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 50L),
+        Double throttleFactor = throttleFactorPolicy.calculateFactor(List.of(new VolumeUsage("1", "/dir", 1000L, 50L),
                 new VolumeUsage("1", "/dir2", 1000L, 50L)));
-        Double throttleFactor = throttleFactorPolicy.currentFactor();
-        Assertions.assertThat(throttleFactor).isCloseTo(0.0, Offset.offset(0.00001d));
-    }
-
-    @Test
-    public void testHardLimitViolationRecovery() {
-        throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 100L)));
-        throttleFactorPolicy.observeVolumeUsage(List.of(new VolumeUsage("1", "/dir", 1000L, 1000L)));
-        Double throttleFactor = throttleFactorPolicy.currentFactor();
-        Assertions.assertThat(throttleFactor).isCloseTo(1.0, Offset.offset(0.00001d));
-    }
-
-    @Test
-    public void testThrottleFactorDefaultsToOpen() {
-        Double throttleFactor = throttleFactorPolicy.currentFactor();
-        Assertions.assertThat(throttleFactor).isCloseTo(1.0, Offset.offset(0.00001d));
+        Assertions.assertThat(throttleFactor).isCloseTo(0.0, OFFSET);
     }
 
     @Test

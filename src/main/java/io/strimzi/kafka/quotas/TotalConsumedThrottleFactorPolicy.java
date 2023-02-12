@@ -5,8 +5,6 @@
 package io.strimzi.kafka.quotas;
 
 import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.yammer.metrics.Metrics;
@@ -21,14 +19,10 @@ import static io.strimzi.kafka.quotas.StaticQuotaCallback.metricName;
  */
 @Deprecated
 public class TotalConsumedThrottleFactorPolicy implements ThrottleFactorPolicy {
-
-    List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final long consumedBytesHardLimit;
     private final long consumedBytesSoftLimit;
 
     private final AtomicLong storageUsed = new AtomicLong(0);
-
-    private volatile Double throttleFactor = 1.0d;
 
     /**
      * Configures the throttle calculation with both a soft and hard limit.
@@ -49,31 +43,19 @@ public class TotalConsumedThrottleFactorPolicy implements ThrottleFactorPolicy {
         Metrics.newGauge(metricName("HardLimitBytes", "StorageChecker", "io.strimzi.kafka.quotas"), new StaticLongGauge(consumedBytesHardLimit));
     }
 
+    /**
+     * @param volumes updated Volume usage data
+     */
     @Override
-    public void addUpdateListener(Runnable listener) {
-        listeners.add(listener);
-    }
-
-    @Override
-    public double currentFactor() {
-        return throttleFactor;
-    }
-
-    @Override
-    public void observeVolumeUsage(Collection<VolumeUsage> volumes) {
+    public double calculateFactor(Collection<VolumeUsage> volumes) {
         long totalConsumed = volumes.stream().mapToLong(VolumeUsage::getConsumedSpace).sum();
-        long oldValue = storageUsed.getAndSet(totalConsumed);
-        if (oldValue != totalConsumed) {
-            if (totalConsumed >= consumedBytesHardLimit) {
-                throttleFactor = 0.0;
-            } else if (totalConsumed >= consumedBytesSoftLimit) {
-                throttleFactor = 1.0d - (1.0d * (totalConsumed - consumedBytesSoftLimit) / (consumedBytesHardLimit - consumedBytesSoftLimit));
-            } else {
-                throttleFactor = 1.0d;
-            }
-            for (Runnable listener : listeners) {
-                listener.run();
-            }
+        storageUsed.set(totalConsumed);
+        if (totalConsumed >= consumedBytesHardLimit) {
+            return  0.0;
+        } else if (totalConsumed >= consumedBytesSoftLimit) {
+            return 1.0d - (1.0d * (totalConsumed - consumedBytesSoftLimit) / (consumedBytesHardLimit - consumedBytesSoftLimit));
+        } else {
+            return  1.0d;
         }
     }
 

@@ -41,14 +41,14 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class StaticQuotaCallbackTest {
 
-    public static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10, StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092");
-    private static final int VOLUME_CAPACITY = 50;
+    public static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10, StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", StaticQuotaConfig.AVAILABLE_BYTES_PROP, "2");
+    private static final long VOLUME_CAPACITY = 50;
 
     @Mock(lenient = true)
     VolumeSourceBuilder volumeSourceBuilder;
 
-    private static VolumeUsage newVolume(int consumedSpace) {
-        return new VolumeUsage("-1", "test", VOLUME_CAPACITY, VOLUME_CAPACITY - consumedSpace);
+    private static VolumeUsage newVolume(long availableBytes) {
+        return new VolumeUsage("-1", "test", VOLUME_CAPACITY, availableBytes);
     }
 
     StaticQuotaCallback target;
@@ -173,7 +173,7 @@ class StaticQuotaCallbackTest {
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.FETCH), "unexpected state on subsequent call without storage state change");
 
         //When
-        volumeObserver.observeVolumeUsage(List.of(newVolume(10)));
+        volumeObserver.observeVolumeUsage(List.of(newVolume(2)));
 
         //Then
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
@@ -197,7 +197,7 @@ class StaticQuotaCallbackTest {
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
         volumeObserver.observeVolumeUsage(List.of(newVolume(1)));
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        volumeObserver.observeVolumeUsage(List.of(newVolume(2)));
+        volumeObserver.observeVolumeUsage(List.of(newVolume(3)));
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 2nd storage state change");
 
         quotaCallback.close();
@@ -217,13 +217,14 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
         ));
 
-        argument.getValue().observeVolumeUsage(List.of(newVolume(17)));
+        long availableBytes = 17;
+        argument.getValue().observeVolumeUsage(List.of(newVolume(availableBytes)));
 
         SortedMap<MetricName, Metric> group = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "StorageChecker");
 
         assertGaugeMetric(group, "SoftLimitBytes", 15L);
         assertGaugeMetric(group, "HardLimitBytes", 16L);
-        assertGaugeMetric(group, "TotalStorageUsedBytes", 17L);
+        assertGaugeMetric(group, "TotalStorageUsedBytes", VOLUME_CAPACITY - availableBytes);
 
         // the mbean name is part of the public api
         MetricName name = group.firstKey();
