@@ -28,7 +28,7 @@ class VolumeSourceBuilderTest {
 
     @BeforeEach
     void setUp() {
-        volumeSourceBuilder = new VolumeSourceBuilder(VolumeSourceBuilder::testForKip827, config -> adminClient);
+        volumeSourceBuilder = new VolumeSourceBuilder(config -> adminClient);
     }
 
     @AfterEach
@@ -54,8 +54,8 @@ class VolumeSourceBuilderTest {
     @Test
     void shouldFailIfKip827NotAvailable() {
         //Given
-        try (final VolumeSourceBuilder noKip827Factory = new VolumeSourceBuilder(() -> false, config -> adminClient)) {
-            noKip827Factory.withConfig(new StaticQuotaConfig(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"), false));
+        try (final VolumeSourceBuilder noKip827Factory = new VolumeSourceBuilder(config -> adminClient)) {
+            noKip827Factory.withConfig(new StaticQuotaConfig(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"), false, false));
             //When
             assertThrows(IllegalStateException.class, noKip827Factory::build);
         }

@@ -6,12 +6,9 @@ package io.strimzi.kafka.quotas;
 
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.LogDirDescription;
 
 /**
  * A builder which ensures the <a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-827%3A+Expose+log+dirs+total+and+usable+space+via+Kafka+API">KIP-827 API</a> is available and will throw exceptions if not.
@@ -20,7 +17,6 @@ import org.apache.kafka.clients.admin.LogDirDescription;
  */
 public class VolumeSourceBuilder implements AutoCloseable {
 
-    private final Supplier<Boolean> kip827Available;
     private final Function<StaticQuotaConfig.KafkaClientConfig, Admin> adminClientFactory;
     private Admin adminClient;
     private StaticQuotaConfig config;
@@ -30,28 +26,16 @@ public class VolumeSourceBuilder implements AutoCloseable {
      * Default production constructor for production usage.
      * Which will lazily create a Kafka admin client using the supplied config.
      */
-    @SuppressFBWarnings("MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR") //false positive we are just passing the method reference
     public VolumeSourceBuilder() {
-        this(VolumeSourceBuilder::testForKip827, kafkaClientConfig -> AdminClient.create(kafkaClientConfig.getKafkaClientConfig()));
+        this(kafkaClientConfig -> AdminClient.create(kafkaClientConfig.getKafkaClientConfig()));
     }
 
     /**
      * Secondary constructor visible for testing.
-     * @param kip827Available used to determine if KIP-827 API's are available
      * @param adminClientFactory factory function for creating Admin clients with the builders' config.
      */
-    /* test */ VolumeSourceBuilder(Supplier<Boolean> kip827Available, Function<StaticQuotaConfig.KafkaClientConfig, Admin> adminClientFactory) {
-        this.kip827Available = kip827Available;
+    /* test */ VolumeSourceBuilder(Function<StaticQuotaConfig.KafkaClientConfig, Admin> adminClientFactory) {
         this.adminClientFactory = adminClientFactory;
-    }
-
-     /*test*/ static Boolean testForKip827() {
-        try {
-            LogDirDescription.class.getDeclaredMethod("totalBytes");
-            return true;
-        } catch (NoSuchMethodException e) {
-            return false;
-        }
     }
 
     /**
@@ -74,7 +58,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
     }
 
     VolumeSource build() {
-        if (!kip827Available.get()) {
+        if (!config.isSupportsKip827()) {
             throw new IllegalStateException("KIP-827 not available, this plugin requires broker version >= 3.3");
         }
         adminClient = adminClientFactory.apply(config.getKafkaClientConfig());

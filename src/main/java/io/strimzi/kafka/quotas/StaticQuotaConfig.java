@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.LogDirDescription;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
@@ -45,6 +46,7 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String AVAILABLE_BYTES_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.bytes";
     static final String ADMIN_BOOTSTRAP_SERVER_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.bootstrap.servers";
     private final KafkaClientConfig kafkaClientConfig;
+    private final boolean supportsKip827;
 
     /**
      * Construct a configuration for the static quota plugin.
@@ -53,6 +55,17 @@ public class StaticQuotaConfig extends AbstractConfig {
      * @param doLog whether the configurations should be logged
      */
     public StaticQuotaConfig(Map<String, ?> props, boolean doLog) {
+        this(props, doLog, testForKip827());
+    }
+
+    /**
+     * Construct a configuration for the static quota plugin.
+     *
+     * @param props the configuration properties
+     * @param doLog whether the configurations should be logged
+     * @param supportsKip827 whether the broker this plugin is running in has volume usage information, see KIP-827
+     */
+    /* test */ StaticQuotaConfig(Map<String, ?> props, boolean doLog, boolean supportsKip827) {
         super(new ConfigDef()
                         .define(PRODUCE_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Produce bandwidth rate quota (in bytes)")
                         .define(FETCH_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Consume bandwidth rate quota (in bytes)")
@@ -65,7 +78,17 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(LOG_DIRS_PROP, LIST, List.of(), HIGH, "Broker log directories"),
                 props,
                 doLog);
+        this.supportsKip827 = supportsKip827;
         kafkaClientConfig = new KafkaClientConfig(props, doLog);
+    }
+
+    private static boolean testForKip827() {
+        try {
+            LogDirDescription.class.getDeclaredMethod("totalBytes");
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
     }
 
     Map<ClientQuotaType, Quota> getQuotaMap() {
@@ -108,6 +131,10 @@ public class StaticQuotaConfig extends AbstractConfig {
 
     KafkaClientConfig getKafkaClientConfig() {
         return kafkaClientConfig;
+    }
+
+    boolean isSupportsKip827() {
+        return supportsKip827;
     }
 
     private static ConfigDef.LambdaValidator nullOrAtLeastValidator(int min) {
