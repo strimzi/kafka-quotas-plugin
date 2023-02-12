@@ -42,7 +42,6 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String STORAGE_QUOTA_SOFT_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.soft";
     static final String STORAGE_QUOTA_HARD_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.hard";
     static final String STORAGE_CHECK_INTERVAL_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.check-interval";
-    static final String LOG_DIRS_PROP = "log.dirs";
     static final String AVAILABLE_BYTES_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.bytes";
     static final String ADMIN_BOOTSTRAP_SERVER_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.bootstrap.servers";
     private final KafkaClientConfig kafkaClientConfig;
@@ -61,8 +60,8 @@ public class StaticQuotaConfig extends AbstractConfig {
     /**
      * Construct a configuration for the static quota plugin.
      *
-     * @param props the configuration properties
-     * @param doLog whether the configurations should be logged
+     * @param props          the configuration properties
+     * @param doLog          whether the configurations should be logged
      * @param supportsKip827 whether the broker this plugin is running in has volume usage information, see KIP-827
      */
     /* test */ StaticQuotaConfig(Map<String, ?> props, boolean doLog, boolean supportsKip827) {
@@ -74,8 +73,7 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(STORAGE_QUOTA_SOFT_PROP, LONG, Long.MAX_VALUE, HIGH, "Hard limit for amount of storage allowed (in bytes)")
                         .define(STORAGE_QUOTA_HARD_PROP, LONG, Long.MAX_VALUE, HIGH, "Soft limit for amount of storage allowed (in bytes)")
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
-                        .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrAtLeastValidator(0), MEDIUM, "stop message production if availableBytes <= this value")
-                        .define(LOG_DIRS_PROP, LIST, List.of(), HIGH, "Broker log directories"),
+                        .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrGreaterThanZeroValidator(), MEDIUM, "stop message production if availableBytes <= this value"),
                 props,
                 doLog);
         this.supportsKip827 = supportsKip827;
@@ -113,16 +111,11 @@ public class StaticQuotaConfig extends AbstractConfig {
     }
 
     Optional<Long> getAvailableBytesLimit() {
-        //TODO range validation.
         return Optional.ofNullable(getLong(AVAILABLE_BYTES_PROP));
     }
 
     int getStorageCheckInterval() {
         return getInt(STORAGE_CHECK_INTERVAL_PROP);
-    }
-
-    List<String> getLogDirs() {
-        return getList(LOG_DIRS_PROP);
     }
 
     List<String> getExcludedPrincipalNameList() {
@@ -137,8 +130,8 @@ public class StaticQuotaConfig extends AbstractConfig {
         return supportsKip827;
     }
 
-    private static ConfigDef.LambdaValidator nullOrAtLeastValidator(int min) {
-        ConfigDef.Range atLeast = ConfigDef.Range.atLeast(min);
+    private static ConfigDef.LambdaValidator nullOrGreaterThanZeroValidator() {
+        ConfigDef.Range atLeast = ConfigDef.Range.atLeast(0);
         return ConfigDef.LambdaValidator.with((name, value) -> {
             if (value != null) {
                 atLeast.ensureValid(name, value);
