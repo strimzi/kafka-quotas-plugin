@@ -7,6 +7,7 @@ package io.strimzi.kafka.quotas;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClient;
 
@@ -26,6 +27,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
      * Default production constructor for production usage.
      * Which will lazily create a Kafka admin client using the supplied config.
      */
+    @SuppressFBWarnings("MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR") //false positive we are just passing the method reference
     public VolumeSourceBuilder() {
         this(kafkaClientConfig -> AdminClient.create(kafkaClientConfig.getKafkaClientConfig()));
     }
