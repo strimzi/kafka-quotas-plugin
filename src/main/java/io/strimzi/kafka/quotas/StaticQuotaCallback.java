@@ -152,7 +152,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckInterval, TimeUnit.SECONDS);
             log.info("Configured quota callback with {}. Storage check interval: {}s", quotaMap, storageCheckInterval);
         } else {
-            log.warn("Static quota callback configured to never check usage: set {} to a positive value to enable", StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP);
+            log.info("Static quota callback configured to never check usage: set {} to a positive value to enable", StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP);
         }
         excludedPrincipalNameList = config.getExcludedPrincipalNameList();
         if (!excludedPrincipalNameList.isEmpty()) {
