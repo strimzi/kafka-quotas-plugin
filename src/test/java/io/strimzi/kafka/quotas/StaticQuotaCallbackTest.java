@@ -114,7 +114,7 @@ class StaticQuotaCallbackTest {
         target.configure(MINIMUM_EXECUTABLE_CONFIG);
 
         //Verify
-        verify(scheduledExecutorService, times(1)).scheduleWithFixedDelay(any(), eq(0L), eq(10000L), eq(TimeUnit.MILLISECONDS));
+        verify(scheduledExecutorService, times(1)).scheduleWithFixedDelay(any(), eq(0L), eq(10L), eq(TimeUnit.SECONDS));
     }
 
     @Test
