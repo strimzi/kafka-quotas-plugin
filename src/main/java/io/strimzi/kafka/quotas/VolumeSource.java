@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -17,8 +18,6 @@ import java.util.stream.Stream;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.kafka.clients.admin.Admin;
-import org.apache.kafka.clients.admin.DescribeClusterResult;
-import org.apache.kafka.clients.admin.DescribeLogDirsResult;
 import org.apache.kafka.clients.admin.LogDirDescription;
 import org.apache.kafka.common.Node;
 import org.slf4j.Logger;
@@ -58,41 +57,50 @@ public class VolumeSource implements Runnable {
 
     @Override
     public void run() {
+        log.info("Updating cluster volume usage.");
+        CompletableFuture<Map<Integer, Map<String, LogDirDescription>>> logDirsPerBrokerPromise = new CompletableFuture<>();
         log.debug("Attempting to describe cluster");
-        final DescribeClusterResult clusterResult = admin.describeCluster();
-        try {
-            clusterResult.nodes().whenComplete((nodes, throwable) -> {
-                if (throwable != null) {
-                    log.error("error while describing cluster", throwable);
-                } else {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Successfully described cluster: " + nodes);
-                    }
-                    onClusterDescribeSuccess(nodes);
+        admin.describeCluster().nodes().whenComplete((nodes, throwable) -> {
+            if (throwable != null) {
+                log.error("error while describing cluster", throwable);
+                logDirsPerBrokerPromise.completeExceptionally(throwable);
+            } else {
+                if (log.isDebugEnabled()) {
+                    log.debug("Successfully described cluster: " + nodes);
                 }
-            }).get(timeout, timeoutUnit);
+                //Deliberately stay on the adminClient thread as the next thing we do is another admin API call
+                onDescribeClusterSuccess(nodes, logDirsPerBrokerPromise);
+            }
+        });
+
+        try {
+            //Bring it back to the original thread to do the actual work of the plug-in.
+            final Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker = logDirsPerBrokerPromise.get(timeout, timeoutUnit);
+            onDescribeLogDirsSuccess(logDirsPerBroker);
+            log.info("Updated cluster volume usage.");
         } catch (InterruptedException e) {
-            log.warn("Caught interrupt exception trying to describe cluster: {}", e.getMessage(), e);
+            log.warn("Caught interrupt exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
             Thread.currentThread().interrupt();
         } catch (ExecutionException | TimeoutException e) {
-            log.warn("Caught exception trying to describe cluster: {}", e.getMessage(), e);
-            //TODO should we cancel the futures here (specifically in the event of a timeout)?
+            log.warn("Caught exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
         }
     }
 
-    private void onClusterDescribeSuccess(Collection<Node> nodes) {
+    private void onDescribeClusterSuccess(Collection<Node> nodes, CompletableFuture<Map<Integer, Map<String, LogDirDescription>>> promise) {
         final Set<Integer> allBrokerIds = nodes.stream().map(Node::id).collect(toSet());
-        final DescribeLogDirsResult logDirsResult = admin.describeLogDirs(allBrokerIds);
-        logDirsResult.allDescriptions().whenComplete((logDirsPerBroker, throwable) -> {
-            if (throwable != null) {
-                log.error("error while describing log dirs", throwable);
-            } else {
-                if (log.isDebugEnabled()) {
-                    log.debug("Successfully described logDirs: " + logDirsPerBroker);
-                }
-                onDescribeLogDirsSuccess(logDirsPerBroker);
-            }
-        });
+
+        admin.describeLogDirs(allBrokerIds)
+                .allDescriptions()
+                .whenComplete((logDirsPerBroker, throwable) -> {
+                    if (throwable != null) {
+                        promise.completeExceptionally(throwable);
+                    } else {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Successfully described logDirs: " + logDirsPerBroker);
+                        }
+                        promise.complete(logDirsPerBroker);
+                    }
+                });
     }
 
     private void onDescribeLogDirsSuccess(Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker) {
