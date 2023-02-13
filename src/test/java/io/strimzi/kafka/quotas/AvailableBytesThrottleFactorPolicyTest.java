@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AvailableBytesThrottleFactorPolicyTest {
 
     private static final long AVAILABLE_BYTES_LIMIT = 100L;
+    private static final Offset<Double> OFFSET = Offset.offset(0.00001d);
 
     private AvailableBytesThrottleFactorPolicy availableBytesThrottleFactorSupplier;
 
@@ -35,7 +36,7 @@ class AvailableBytesThrottleFactorPolicyTest {
         final double actualFactor = availableBytesThrottleFactorSupplier.calculateFactor(List.of(volumeWithAvailableBytes(1000L)));
 
         //Then
-        assertThat(actualFactor).isCloseTo(1.0d, Offset.offset(0.00001));
+        assertThat(actualFactor).isCloseTo(1.0d, OFFSET);
     }
 
     @Test
@@ -46,7 +47,7 @@ class AvailableBytesThrottleFactorPolicyTest {
         final double actualFactor = availableBytesThrottleFactorSupplier.calculateFactor(List.of(volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT)));
 
         //Then
-        assertThat(actualFactor).isCloseTo(0.0d, Offset.offset(0.00001));
+        assertThat(actualFactor).isCloseTo(0.0d, OFFSET);
     }
 
 
@@ -58,7 +59,7 @@ class AvailableBytesThrottleFactorPolicyTest {
         final double actualFactor = availableBytesThrottleFactorSupplier.calculateFactor(List.of(volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT - 1)));
 
         //Then
-        assertThat(actualFactor).isCloseTo(0.0d, Offset.offset(0.00001));
+        assertThat(actualFactor).isCloseTo(0.0d, OFFSET);
     }
 
     @Test
@@ -70,7 +71,7 @@ class AvailableBytesThrottleFactorPolicyTest {
                 volumeWithAvailableBytes(AVAILABLE_BYTES_LIMIT - 1)));
 
         //Then
-        assertThat(actualFactor).isCloseTo(0.0d, Offset.offset(0.00001));
+        assertThat(actualFactor).isCloseTo(0.0d, OFFSET);
     }
 
     private static VolumeUsage volumeWithAvailableBytes(long availableBytes) {
