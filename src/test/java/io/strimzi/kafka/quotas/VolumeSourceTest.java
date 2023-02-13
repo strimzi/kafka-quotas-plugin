@@ -118,6 +118,28 @@ class VolumeSourceTest {
     }
 
     @Test
+    void shouldFilterVolumesWithoutAvailableBytes() {
+        //Given
+        final int nodeId = 1;
+        givenNode(nodeId);
+        givenLogDirDescription(nodeId, "dir1", -1L, -1L);
+
+        int nodeId2 = 2;
+        givenNode(nodeId2);
+        givenLogDirDescription(nodeId2, "dir1", 30, 5);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final List<Collection<VolumeUsage>> results = capturingVolumeObserver.getActualResults();
+        assertThat(results).hasSize(1);
+        final Collection<VolumeUsage> onlyInvocation = results.get(0);
+        VolumeUsage expected2 = new VolumeUsage("2", "dir1", 30, 5);
+        assertThat(onlyInvocation).containsExactly(expected2);
+    }
+
+    @Test
     void shouldProduceEmptyIfDescribeLogDirsReturnsEmptyMaps() {
         //Given
         givenNode(1);
@@ -151,7 +173,7 @@ class VolumeSourceTest {
         nodes.add(singleNode);
     }
 
-    private void givenLogDirDescription(int nodeId, String logDir, int totalBytes, int usableBytes) {
+    private void givenLogDirDescription(int nodeId, String logDir, long totalBytes, long usableBytes) {
         final LogDirDescription dirDescription = new LogDirDescription(null, Map.of(), totalBytes, usableBytes);
         descriptions.computeIfAbsent(nodeId, HashMap::new).put(logDir, dirDescription);
     }

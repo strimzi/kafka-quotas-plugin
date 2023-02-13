@@ -8,6 +8,7 @@ package io.strimzi.kafka.quotas;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -107,6 +108,7 @@ public class VolumeSource implements Runnable {
         final List<VolumeUsage> volumes = logDirsPerBroker.entrySet()
                 .stream()
                 .flatMap(VolumeSource::toVolumes)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toUnmodifiableList());
         if (log.isDebugEnabled()) {
             log.debug("Notifying consumers of volumes: " + volumes);
@@ -114,13 +116,18 @@ public class VolumeSource implements Runnable {
         volumeObserver.observeVolumeUsage(volumes);
     }
 
-
     private static Stream<? extends VolumeUsage> toVolumes(Map.Entry<Integer, Map<String, LogDirDescription>> brokerIdToLogDirs) {
         return brokerIdToLogDirs.getValue().entrySet().stream().map(logDirs -> {
             LogDirDescription logDirDescription = logDirs.getValue();
-            final long totalBytes = logDirDescription.totalBytes().orElse(0);
-            final long usableBytes = logDirDescription.usableBytes().orElse(0);
-            return new VolumeUsage("" + brokerIdToLogDirs.getKey(), logDirs.getKey(), totalBytes, usableBytes);
+            //Filter out Volumes from Brokers which do not support KIP-827
+            //Possible during upgrades from versions before 3.3 to 3.3+
+            if (logDirDescription.totalBytes().isPresent() && logDirDescription.usableBytes().isPresent()) {
+                final long totalBytes = logDirDescription.totalBytes().getAsLong();
+                final long usableBytes = logDirDescription.usableBytes().getAsLong();
+                return new VolumeUsage("" + brokerIdToLogDirs.getKey(), logDirs.getKey(), totalBytes, usableBytes);
+            } else {
+                return null;
+            }
         });
     }
 
