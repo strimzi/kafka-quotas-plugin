@@ -39,6 +39,14 @@ class TotalConsumedThrottleFactorPolicyTest {
     }
 
     @Test
+    public void shouldThrottleWhenSoftLimitIsHigherThanHardLimit() {
+        final TotalConsumedThrottleFactorPolicy factorPolicy = new TotalConsumedThrottleFactorPolicy(700L, 800L);
+        Double throttleFactor = factorPolicy.calculateFactor(List.of(new VolumeUsage("1", "/dir", 1000L, 100L)));
+
+        Assertions.assertThat(throttleFactor).isCloseTo(0.0, OFFSET);
+    }
+
+    @Test
     public void testHardLimitViolation() {
         Double throttleFactor = throttleFactorPolicy.calculateFactor(List.of(new VolumeUsage("1", "/dir", 1000L, 100L)));
 
