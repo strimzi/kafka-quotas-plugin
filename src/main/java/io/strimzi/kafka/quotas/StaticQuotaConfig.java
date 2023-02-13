@@ -73,7 +73,7 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(STORAGE_QUOTA_SOFT_PROP, LONG, Long.MAX_VALUE, HIGH, "Hard limit for amount of storage allowed (in bytes)")
                         .define(STORAGE_QUOTA_HARD_PROP, LONG, Long.MAX_VALUE, HIGH, "Soft limit for amount of storage allowed (in bytes)")
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
-                        .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrGreaterThanZeroValidator(), MEDIUM, "stop message production if availableBytes <= this value"),
+                        .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrGreaterThanZeroValidator(), MEDIUM, "Stop message production if availableBytes <= this value"),
                 props,
                 doLog);
         this.supportsKip827 = supportsKip827;
