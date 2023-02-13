@@ -16,7 +16,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
 
     private final ThrottleFactorPolicy factorPolicy;
     private final Runnable listener;
-    private volatile Double throttleFactor = 1.0d;
+    private volatile double throttleFactor = 1.0d;
 
     /**
      * @param factorPolicy Which policy to apply
@@ -34,7 +34,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
 
     @Override
     public void observeVolumeUsage(Collection<VolumeUsage> observedVolumes) {
-        Double old = this.throttleFactor;
+        double old = this.throttleFactor;
         this.throttleFactor = factorPolicy.calculateFactor(observedVolumes);
         if (!Objects.equals(old, this.throttleFactor)) {
             listener.run();
