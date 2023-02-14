@@ -4,6 +4,9 @@
  */
 package io.strimzi.kafka.quotas;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Collection;
 import java.util.Objects;
 
@@ -13,7 +16,7 @@ import java.util.Objects;
  * Notifies a listener when the factor changes.
  */
 public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource {
-
+    private static final Logger log = LoggerFactory.getLogger(PolicyBasedThrottle.class);
     private final ThrottleFactorPolicy factorPolicy;
     private final Runnable listener;
     private volatile double throttleFactor = 1.0d;
@@ -37,7 +40,10 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
         double old = this.throttleFactor;
         this.throttleFactor = factorPolicy.calculateFactor(observedVolumes);
         if (!Objects.equals(old, this.throttleFactor)) {
+            log.info("Throttle Factor changed from {} to {}, notifying listener", old, this.throttleFactor);
             listener.run();
+        } else {
+            log.debug("Throttle Factor unchanged at {}, not notifying listener", throttleFactor);
         }
     }
 }
