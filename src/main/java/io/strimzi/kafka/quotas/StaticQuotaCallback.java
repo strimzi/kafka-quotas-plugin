@@ -139,11 +139,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
                 throttleFactorPolicy = new AvailableBytesThrottleFactorPolicy(availableBytesLimitConfig.get());
                 log.info("Available bytes limit {}", availableBytesLimitConfig.get());
             } else {
-                storageQuotaSoft = config.getSoftStorageQuota();
-                storageQuotaHard = config.getHardStorageQuota();
-
-                throttleFactorPolicy = new TotalConsumedThrottleFactorPolicy(storageQuotaHard, storageQuotaSoft);
-                log.info("Total consumed Storage quota (soft, hard): ({}, {}).", storageQuotaSoft, storageQuotaHard);
+                throw new IllegalStateException("storageCheckInterval > 0 but no limit type configured");
             }
             final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE));
             throttleFactorSource = factorNotifier;

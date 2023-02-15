@@ -39,8 +39,6 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String FETCH_QUOTA_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".fetch";
     static final String REQUEST_QUOTA_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".request";
     static final String EXCLUDED_PRINCIPAL_NAME_LIST_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".excluded.principal.name.list";
-    static final String STORAGE_QUOTA_SOFT_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.soft";
-    static final String STORAGE_QUOTA_HARD_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.hard";
     static final String STORAGE_CHECK_INTERVAL_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.check-interval";
     static final String AVAILABLE_BYTES_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.bytes";
     static final String ADMIN_BOOTSTRAP_SERVER_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.bootstrap.servers";
@@ -70,8 +68,6 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(FETCH_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Consume bandwidth rate quota (in bytes)")
                         .define(REQUEST_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Request processing time quota (in seconds)")
                         .define(EXCLUDED_PRINCIPAL_NAME_LIST_PROP, LIST, List.of(), MEDIUM, "List of principals that are excluded from the quota")
-                        .define(STORAGE_QUOTA_SOFT_PROP, LONG, Long.MAX_VALUE, HIGH, "Hard limit for amount of storage allowed (in bytes)")
-                        .define(STORAGE_QUOTA_HARD_PROP, LONG, Long.MAX_VALUE, HIGH, "Soft limit for amount of storage allowed (in bytes)")
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
                         .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrGreaterThanZeroValidator(), MEDIUM, "Stop message production if availableBytes <= this value"),
                 props,
@@ -100,14 +96,6 @@ public class StaticQuotaConfig extends AbstractConfig {
         m.put(ClientQuotaType.REQUEST, Quota.upperBound(requestBound));
 
         return m;
-    }
-
-    long getHardStorageQuota() {
-        return getLong(STORAGE_QUOTA_HARD_PROP);
-    }
-
-    long getSoftStorageQuota() {
-        return getLong(STORAGE_QUOTA_SOFT_PROP);
     }
 
     Optional<Long> getAvailableBytesLimit() {
