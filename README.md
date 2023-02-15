@@ -21,34 +21,6 @@ If you have a max of 40 MB/second, 2 producers, and one of them is producing mes
 
 **Warning: this version is not included in Strimzi yet, see tag [0.2.0](https://github.com/strimzi/kafka-quotas-plugin/tree/0.2.0)** for current Strimzi-compatible docs.
 
-The plugin is already included in Strimzi and needs to be configured in the `Kafka` custom resource.
-The following example shows the configuration:
-
-```yaml
-apiVersion: kafka.strimzi.io/v1beta2
-kind: Kafka
-metadata:
-  name: my-cluster
-  labels:
-    app: my-cluster
-spec:
-  # ...
-  kafka:
-    # ...
-    config:
-      # ...
-      client.quota.callback.class: io.strimzi.kafka.quotas.StaticQuotaCallback
-      client.quota.callback.static.produce: 1000000                                    # 1 MB/s
-      client.quota.callback.static.fetch: 1000000                                      # 1 MB/s
-      client.quota.callback.static.storage.per.volume.limit.min.available.bytes	: 5368709120 # 5GB
-      client.quota.callback.static.storage.check-interval: 5                           # Check storage every 5 seconds
-      client.quota.callback.static.excluded.principal.name.list: principal1,principal2 # Optional list of principals not to be subjected to the quota
-  # ...
-```
-
-Strimzi will be responsible for configuring `client.quota.callback.static.kafka.admin.bootstrap.servers` and other admin
-client configurations required to communicate with the broker.
-
 ## Using with other Apache Kafka clusters 
 
 The Quota plugin can be also used with non-Strimzi Apache Kafka clusters.
