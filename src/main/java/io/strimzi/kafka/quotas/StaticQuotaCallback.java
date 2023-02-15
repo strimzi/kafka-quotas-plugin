@@ -133,11 +133,18 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         long storageCheckInterval = config.getStorageCheckInterval();
         if (storageCheckInterval > 0L) {
             final Optional<Long> availableBytesLimitConfig = config.getAvailableBytesLimit();
-
+            final Optional<Double> availableRatioLimit = config.getAvailableRatioLimit();
+            if (availableBytesLimitConfig.isPresent() && availableRatioLimit.isPresent()) {
+                String props = String.join(",", StaticQuotaConfig.AVAILABLE_BYTES_PROP, StaticQuotaConfig.AVAILABLE_RATIO_PROP);
+                throw new IllegalStateException("Both limit types configured, only configure one of [" + props + "]");
+            }
             ThrottleFactorPolicy throttleFactorPolicy;
             if (availableBytesLimitConfig.isPresent()) {
                 throttleFactorPolicy = new AvailableBytesThrottleFactorPolicy(availableBytesLimitConfig.get());
                 log.info("Available bytes limit {}", availableBytesLimitConfig.get());
+            } else if (availableRatioLimit.isPresent()) {
+                throttleFactorPolicy = new AvailableRatioThrottleFactorPolicy(availableRatioLimit.get());
+                log.info("Available ratio limit {}", availableRatioLimit.get());
             } else {
                 throw new IllegalStateException("storageCheckInterval > 0 but no limit type configured");
             }

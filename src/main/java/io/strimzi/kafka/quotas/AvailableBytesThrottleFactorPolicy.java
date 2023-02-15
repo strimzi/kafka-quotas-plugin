@@ -2,15 +2,18 @@
  * Copyright Strimzi authors.
  * License: Apache License 2.0 (see the file LICENSE or http://apache.org/licenses/LICENSE-2.0.html).
  */
-
 package io.strimzi.kafka.quotas;
 
-import java.util.Collection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Determines if the number of available bytes on any given volume falls below the configured limit.
  */
-public class AvailableBytesThrottleFactorPolicy implements ThrottleFactorPolicy {
+public class AvailableBytesThrottleFactorPolicy extends PerVolumeThrottleFactorPolicy {
+
+    private static final Logger log = LoggerFactory.getLogger(AvailableBytesThrottleFactorPolicy.class);
+
     private final long availableBytesLimit;
 
     /**
@@ -23,15 +26,11 @@ public class AvailableBytesThrottleFactorPolicy implements ThrottleFactorPolicy 
     }
 
     @Override
-    public double calculateFactor(Collection<VolumeUsage> observedVolumes) {
-        if (shouldThrottle(observedVolumes)) {
-            return 0.0d;
-        } else {
-            return 1.0d;
+    boolean shouldThrottle(VolumeUsage volume) {
+        boolean shouldThrottle = volume.getAvailableBytes() <= availableBytesLimit;
+        if (shouldThrottle) {
+            log.debug("A volume containing logDir {} on broker {} has available bytes of {}, below the limit of {}", volume.getLogDir(), volume.getBrokerId(), volume.getAvailableBytes(), availableBytesLimit);
         }
-    }
-
-    private boolean shouldThrottle(Collection<VolumeUsage> observedVolumes) {
-        return observedVolumes.stream().anyMatch(volume -> volume.getAvailableBytes() <= availableBytesLimit);
+        return shouldThrottle;
     }
 }

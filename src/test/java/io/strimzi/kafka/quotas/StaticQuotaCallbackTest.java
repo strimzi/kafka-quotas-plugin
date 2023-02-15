@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.offset;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -112,6 +113,47 @@ class StaticQuotaCallbackTest {
         //Then
         double quotaLimit = quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of());
         assertThat(quotaLimit).isCloseTo(1.0, offset(0.00001d));
+    }
+
+    @Test
+    void shouldThrottleOnAvailableRatio() {
+        //Given
+        ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
+        when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
+
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
+
+        quotaCallback.configure(Map.of(
+                StaticQuotaConfig.AVAILABLE_RATIO_PROP, 0.5,
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10,
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
+        ));
+
+        //When
+        argument.getValue().observeVolumeUsage(List.of(new VolumeUsage("-1", "test", 30L, 15L)));
+
+        //Then
+        double quotaLimit = quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of());
+        assertThat(quotaLimit).isCloseTo(1.0, offset(0.00001d));
+    }
+
+    @Test
+    void configuringBothPerVolumeLimitTypesNotAllowed() {
+        //Given
+        ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
+        when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
+
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
+
+        //Then
+        assertThrows(IllegalStateException.class, () -> {
+            quotaCallback.configure(Map.of(
+                    StaticQuotaConfig.AVAILABLE_RATIO_PROP, 0.5,
+                    StaticQuotaConfig.AVAILABLE_BYTES_PROP, 1,
+                    StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10,
+                    StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
+            ));
+        });
     }
 
     @Test
