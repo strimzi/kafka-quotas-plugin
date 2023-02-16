@@ -18,12 +18,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import io.strimzi.kafka.quotas.VolumeUsageObservation.VolumeSourceObservationStatus;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.LogDirDescription;
 import org.apache.kafka.common.Node;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static io.strimzi.kafka.quotas.VolumeUsageObservation.failure;
 import static io.strimzi.kafka.quotas.VolumeUsageObservation.success;
 import static java.util.stream.Collectors.toSet;
 
@@ -59,62 +61,70 @@ public class VolumeSource implements Runnable {
 
     @Override
     public void run() {
-        log.info("Updating cluster volume usage.");
-        CompletableFuture<Map<Integer, Map<String, LogDirDescription>>> logDirsPerBrokerPromise = new CompletableFuture<>();
-        log.debug("Attempting to describe cluster");
-        admin.describeCluster().nodes().whenComplete((nodes, throwable) -> {
-            if (throwable != null) {
-                log.error("error while describing cluster", throwable);
-                logDirsPerBrokerPromise.completeExceptionally(throwable);
-            } else {
-                if (log.isDebugEnabled()) {
-                    log.debug("Successfully described cluster: " + nodes);
-                }
-                //Deliberately stay on the adminClient thread as the next thing we do is another admin API call
-                onDescribeClusterSuccess(nodes, logDirsPerBrokerPromise);
-            }
-        });
-
         try {
+            log.info("Updating cluster volume usage.");
+            CompletableFuture<VolumeUsageObservation> volumeObservationPromise = new CompletableFuture<>();
+            log.debug("Attempting to describe cluster");
+            admin.describeCluster().nodes().whenComplete((nodes, throwable) -> {
+                if (throwable != null) {
+                    log.error("error while describing cluster", throwable);
+                    volumeObservationPromise.complete(failure(VolumeSourceObservationStatus.DESCRIBE_CLUSTER_ERROR, throwable));
+                } else {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Successfully described cluster: " + nodes);
+                    }
+                    //Deliberately stay on the adminClient thread as the next thing we do is another admin API call
+                    onDescribeClusterSuccess(nodes, volumeObservationPromise);
+                }
+            });
             //Bring it back to the original thread to do the actual work of the plug-in.
-            final Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker = logDirsPerBrokerPromise.get(timeout, timeoutUnit);
-            onDescribeLogDirsSuccess(logDirsPerBroker);
+            final VolumeUsageObservation observation = volumeObservationPromise.get(timeout, timeoutUnit);
+            notifyObserver(observation);
             log.info("Updated cluster volume usage.");
         } catch (InterruptedException e) {
+            notifyObserver(failure(VolumeSourceObservationStatus.INTERRUPTED, e));
             log.warn("Caught interrupt exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
             Thread.currentThread().interrupt();
-        } catch (ExecutionException | TimeoutException e) {
-            log.warn("Caught exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
+        } catch (ExecutionException e) {
+            volumeObserver.observeVolumeUsage(failure(VolumeSourceObservationStatus.EXECUTION_EXCEPTION, e));
+            log.warn("Caught execution exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
+        } catch (TimeoutException e) {
+            notifyObserver(failure(VolumeSourceObservationStatus.SAFETY_TIMEOUT, e));
+            log.warn("Caught timeout exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
+        } catch (RuntimeException e) {
+            notifyObserver(failure(VolumeSourceObservationStatus.EXCEPTION, e));
+            log.warn("Caught runtime exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
         }
+
     }
 
-    private void onDescribeClusterSuccess(Collection<Node> nodes, CompletableFuture<Map<Integer, Map<String, LogDirDescription>>> promise) {
+    private void notifyObserver(VolumeUsageObservation observation) {
+        if (log.isDebugEnabled()) {
+            log.debug("Notifying consumers of volumes usage observation: " + observation);
+        }
+        volumeObserver.observeVolumeUsage(observation);
+    }
+
+    private void onDescribeClusterSuccess(Collection<Node> nodes, CompletableFuture<VolumeUsageObservation> promise) {
         final Set<Integer> allBrokerIds = nodes.stream().map(Node::id).collect(toSet());
 
         admin.describeLogDirs(allBrokerIds)
                 .allDescriptions()
                 .whenComplete((logDirsPerBroker, throwable) -> {
                     if (throwable != null) {
-                        promise.completeExceptionally(throwable);
+                        promise.complete(VolumeUsageObservation.failure(VolumeSourceObservationStatus.DESCRIBE_LOG_DIR_ERROR, throwable));
                     } else {
                         if (log.isDebugEnabled()) {
                             log.debug("Successfully described logDirs: " + logDirsPerBroker);
                         }
-                        promise.complete(logDirsPerBroker);
+                        final List<VolumeUsage> volumes = logDirsPerBroker.entrySet()
+                                .stream()
+                                .flatMap(VolumeSource::toVolumes)
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.toUnmodifiableList());
+                        promise.complete(success(volumes));
                     }
                 });
-    }
-
-    private void onDescribeLogDirsSuccess(Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker) {
-        final List<VolumeUsage> volumes = logDirsPerBroker.entrySet()
-                .stream()
-                .flatMap(VolumeSource::toVolumes)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toUnmodifiableList());
-        if (log.isDebugEnabled()) {
-            log.debug("Notifying consumers of volumes: " + volumes);
-        }
-        volumeObserver.observeVolumeUsage(success(volumes));
     }
 
     private static Stream<? extends VolumeUsage> toVolumes(Map.Entry<Integer, Map<String, LogDirDescription>> brokerIdToLogDirs) {

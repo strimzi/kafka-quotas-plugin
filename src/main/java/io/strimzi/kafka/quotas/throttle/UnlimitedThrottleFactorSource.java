@@ -3,7 +3,7 @@
  * License: Apache License 2.0 (see the file LICENSE or http://apache.org/licenses/LICENSE-2.0.html).
  */
 
-package io.strimzi.kafka.quotas;
+package io.strimzi.kafka.quotas.throttle;
 
 /**
  * An implementation of {@link ThrottleFactorSource} which applies no limits.
