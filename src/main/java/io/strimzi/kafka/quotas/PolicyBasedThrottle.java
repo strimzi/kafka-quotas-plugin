@@ -7,8 +7,9 @@ package io.strimzi.kafka.quotas;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
 import java.util.Objects;
+
+import static io.strimzi.kafka.quotas.VolumeUsageObservation.VolumeSourceObservationStatus.SUCCESS;
 
 
 /**
@@ -36,14 +37,16 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
     }
 
     @Override
-    public void observeVolumeUsage(Collection<VolumeUsage> observedVolumes) {
-        double old = this.throttleFactor;
-        this.throttleFactor = factorPolicy.calculateFactor(observedVolumes);
-        if (!Objects.equals(old, this.throttleFactor)) {
-            log.info("Throttle Factor changed from {} to {}, notifying listener", old, this.throttleFactor);
-            listener.run();
-        } else {
-            log.debug("Throttle Factor unchanged at {}, not notifying listener", throttleFactor);
+    public void observeVolumeUsage(VolumeUsageObservation observedVolumes) {
+        if (observedVolumes.getStatus() == SUCCESS) {
+            double old = this.throttleFactor;
+            this.throttleFactor = factorPolicy.calculateFactor(observedVolumes.getVolumeUsages());
+            if (!Objects.equals(old, this.throttleFactor)) {
+                log.info("Throttle Factor changed from {} to {}, notifying listener", old, this.throttleFactor);
+                listener.run();
+            } else {
+                log.debug("Throttle Factor unchanged at {}, not notifying listener", throttleFactor);
+            }
         }
     }
 }

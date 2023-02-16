@@ -24,6 +24,7 @@ import org.apache.kafka.common.Node;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static io.strimzi.kafka.quotas.VolumeUsageObservation.success;
 import static java.util.stream.Collectors.toSet;
 
 
@@ -113,7 +114,7 @@ public class VolumeSource implements Runnable {
         if (log.isDebugEnabled()) {
             log.debug("Notifying consumers of volumes: " + volumes);
         }
-        volumeObserver.observeVolumeUsage(volumes);
+        volumeObserver.observeVolumeUsage(success(volumes));
     }
 
     private static Stream<? extends VolumeUsage> toVolumes(Map.Entry<Integer, Map<String, LogDirDescription>> brokerIdToLogDirs) {

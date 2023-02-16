@@ -27,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static io.strimzi.kafka.quotas.VolumeUsageObservation.success;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.offset;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -108,7 +109,7 @@ class StaticQuotaCallbackTest {
         ));
 
         //When
-        argument.getValue().observeVolumeUsage(List.of(newVolume(10L)));
+        argument.getValue().observeVolumeUsage(success(List.of(newVolume(10L))));
 
         //Then
         double quotaLimit = quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of());
@@ -130,7 +131,7 @@ class StaticQuotaCallbackTest {
         ));
 
         //When
-        argument.getValue().observeVolumeUsage(List.of(new VolumeUsage("-1", "test", 30L, 15L)));
+        argument.getValue().observeVolumeUsage(success(List.of(new VolumeUsage("-1", "test", 30L, 15L))));
 
         //Then
         double quotaLimit = quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of());
@@ -239,7 +240,7 @@ class StaticQuotaCallbackTest {
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.FETCH), "unexpected state on subsequent call without storage state change");
 
         //When
-        volumeObserver.observeVolumeUsage(List.of(newVolume(2)));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(2))));
 
         //Then
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
@@ -259,11 +260,11 @@ class StaticQuotaCallbackTest {
 
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        volumeObserver.observeVolumeUsage(List.of(newVolume(1)));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(1))));
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
-        volumeObserver.observeVolumeUsage(List.of(newVolume(1)));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(1))));
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        volumeObserver.observeVolumeUsage(List.of(newVolume(3)));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(3))));
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 2nd storage state change");
 
         quotaCallback.close();

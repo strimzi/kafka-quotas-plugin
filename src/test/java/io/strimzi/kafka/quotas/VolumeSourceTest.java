@@ -6,13 +6,13 @@
 package io.strimzi.kafka.quotas;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import io.strimzi.kafka.quotas.VolumeUsageObservation.VolumeSourceObservationStatus;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.DescribeClusterResult;
 import org.apache.kafka.clients.admin.DescribeLogDirsResult;
@@ -68,10 +68,11 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final List<Collection<VolumeUsage>> results = capturingVolumeObserver.getActualResults();
+        final List<VolumeUsageObservation> results = capturingVolumeObserver.getActualResults();
         assertThat(results).hasSize(1);
-        final Collection<VolumeUsage> onlyInvocation = results.get(0);
-        assertThat(onlyInvocation).containsExactly(new VolumeUsage("1", "dir1", 50, 10));
+        final VolumeUsageObservation onlyInvocation = results.get(0);
+        assertThat(onlyInvocation.getStatus()).isEqualTo(VolumeSourceObservationStatus.SUCCESS);
+        assertThat(onlyInvocation.getVolumeUsages()).containsExactly(new VolumeUsage("1", "dir1", 50, 10));
     }
 
     @Test
@@ -86,12 +87,13 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final List<Collection<VolumeUsage>> results = capturingVolumeObserver.getActualResults();
+        final List<VolumeUsageObservation> results = capturingVolumeObserver.getActualResults();
         assertThat(results).hasSize(1);
-        final Collection<VolumeUsage> onlyInvocation = results.get(0);
+        final VolumeUsageObservation onlyInvocation = results.get(0);
+        assertThat(onlyInvocation.getStatus()).isEqualTo(VolumeSourceObservationStatus.SUCCESS);
         VolumeUsage expected1 = new VolumeUsage("1", "dir1", 50, 10);
         VolumeUsage expected2 = new VolumeUsage("1", "dir2", 30, 5);
-        assertThat(onlyInvocation).containsExactlyInAnyOrder(expected1, expected2);
+        assertThat(onlyInvocation.getVolumeUsages()).containsExactlyInAnyOrder(expected1, expected2);
     }
 
     @Test
@@ -109,12 +111,13 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final List<Collection<VolumeUsage>> results = capturingVolumeObserver.getActualResults();
+        final List<VolumeUsageObservation> results = capturingVolumeObserver.getActualResults();
         assertThat(results).hasSize(1);
-        final Collection<VolumeUsage> onlyInvocation = results.get(0);
+        final VolumeUsageObservation onlyInvocation = results.get(0);
+        assertThat(onlyInvocation.getStatus()).isEqualTo(VolumeSourceObservationStatus.SUCCESS);
         VolumeUsage expected1 = new VolumeUsage("1", "dir1", 50, 10);
         VolumeUsage expected2 = new VolumeUsage("2", "dir1", 30, 5);
-        assertThat(onlyInvocation).containsExactlyInAnyOrder(expected1, expected2);
+        assertThat(onlyInvocation.getVolumeUsages()).containsExactlyInAnyOrder(expected1, expected2);
     }
 
     @Test
@@ -132,11 +135,12 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final List<Collection<VolumeUsage>> results = capturingVolumeObserver.getActualResults();
+        final List<VolumeUsageObservation> results = capturingVolumeObserver.getActualResults();
         assertThat(results).hasSize(1);
-        final Collection<VolumeUsage> onlyInvocation = results.get(0);
+        final VolumeUsageObservation onlyInvocation = results.get(0);
+        assertThat(onlyInvocation.getStatus()).isEqualTo(VolumeSourceObservationStatus.SUCCESS);
         VolumeUsage expected2 = new VolumeUsage("2", "dir1", 30, 5);
-        assertThat(onlyInvocation).containsExactly(expected2);
+        assertThat(onlyInvocation.getVolumeUsages()).containsExactlyInAnyOrder(expected2);
     }
 
     @Test
@@ -148,21 +152,22 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final List<Collection<VolumeUsage>> results = capturingVolumeObserver.getActualResults();
+        final List<VolumeUsageObservation> results = capturingVolumeObserver.getActualResults();
         assertThat(results).hasSize(1);
-        final Collection<VolumeUsage> onlyInvocation = results.get(0);
-        assertThat(onlyInvocation).isEmpty();
+        final VolumeUsageObservation onlyInvocation = results.get(0);
+        assertThat(onlyInvocation.getStatus()).isEqualTo(VolumeSourceObservationStatus.SUCCESS);
+        assertThat(onlyInvocation.getVolumeUsages()).isEmpty();
     }
 
     private static class CapturingVolumeObserver implements VolumeObserver {
-        private final List<Collection<VolumeUsage>> actualResults = new ArrayList<>();
+        private final List<VolumeUsageObservation> actualResults = new ArrayList<>();
 
         @Override
-        public void observeVolumeUsage(Collection<VolumeUsage> volumes) {
+        public void observeVolumeUsage(VolumeUsageObservation volumes) {
             actualResults.add(volumes);
         }
 
-        public List<Collection<VolumeUsage>> getActualResults() {
+        public List<VolumeUsageObservation> getActualResults() {
             return actualResults;
         }
     }
