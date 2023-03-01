@@ -19,31 +19,7 @@ If you have a max of 40 MB/second, 2 producers, and one of them is producing mes
 
 ## Using with Strimzi
 
-The plugin is already included in Strimzi and needs to be configured in the `Kafka` custom resource.
-The following example shows the configuration:
-
-```yaml
-apiVersion: kafka.strimzi.io/v1beta2
-kind: Kafka
-metadata:
-  name: my-cluster
-  labels:
-    app: my-cluster
-spec:
-  # ...
-  kafka:
-    # ...
-    config:
-      # ...
-      client.quota.callback.class: io.strimzi.kafka.quotas.StaticQuotaCallback
-      client.quota.callback.static.produce: 1000000                                    # 1 MB/s
-      client.quota.callback.static.fetch: 1000000                                      # 1 MB/s
-      client.quota.callback.static.storage.soft: 239538204672                          # 80GB
-      client.quota.callback.static.storage.hard: 249538204672                          # 100GB
-      client.quota.callback.static.storage.check-interval: 5                           # Check storage every 5 seconds
-      client.quota.callback.static.excluded.principal.name.list: principal1,principal2 # Optional list of principals not to be subjected to the quota
-  # ...
-```
+**Warning: this version is not included in Strimzi yet, see tag [0.2.0](https://github.com/strimzi/kafka-quotas-plugin/tree/0.2.0)** for current Strimzi-compatible docs.
 
 ## Using with other Apache Kafka clusters 
 
@@ -60,10 +36,10 @@ client.quota.callback.class=io.strimzi.kafka.quotas.StaticQuotaCallback
 client.quota.callback.static.produce=1000000
 client.quota.callback.static.fetch=1000000
 
-# Storage quota settings in bytes. Clients will be throttled linearly between produce quota and 0 after soft limit.
-# In this example the soft limit is set to 80GB and the hard limit to 100GB 
-client.quota.callback.static.storage.soft=80000000000
-client.quota.callback.static.storage.hard=100000000000
+client.quota.callback.static.kafka.admin.bootstrap.servers=localhost:9092 # required if storage.check-interval is >0
+client.quota.callback.static.kafka.admin.ssl.truststore.location=/tmp/trust.jks # optionally configure the admin client further
+# Storage quota settings in bytes. Clients will be throttled to 0 when any volume in the cluster has <= 5GB available bytes
+client.quota.callback.static.storage.per.volume.limit.min.available.bytes=5368709120
 
 # Check storage usage every 5 seconds
 client.quota.callback.static.storage.check-interval=5
@@ -75,9 +51,6 @@ client.quota.callback.static.excluded.principal.name.list=principal1,principal2
 ## Metrics
 
 The plugin currently provides the following metrics:
-* `io.strimzi.kafka.quotas:type=StorageChecker,name=TotalStorageUsedBytes` shows the current storage usage
-* `io.strimzi.kafka.quotas:type=StorageChecker,name=SoftLimitBytes` shows the currently configured soft limit
-* `io.strimzi.kafka.quotas:type=StorageChecker,name=HardLimitBytes` shows the currently configured hard limit
 * `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Produce` shows the currently configured produce quota
 * `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Fetch` shows the currently configured fetch quota
 * `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Request` shows the currently configured request quota

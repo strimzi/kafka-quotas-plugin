@@ -228,37 +228,6 @@ class StaticQuotaCallbackTest {
     }
 
     @Test
-    void storageCheckerMetrics() {
-        ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
-        when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
-
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
-
-        quotaCallback.configure(Map.of(
-                StaticQuotaConfig.STORAGE_QUOTA_SOFT_PROP, 15L,
-                StaticQuotaConfig.STORAGE_QUOTA_HARD_PROP, 16L,
-                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10,
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
-        ));
-
-        long availableBytes = 17;
-        argument.getValue().observeVolumeUsage(List.of(newVolume(availableBytes)));
-
-        SortedMap<MetricName, Metric> group = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "StorageChecker");
-
-        assertGaugeMetric(group, "SoftLimitBytes", 15L);
-        assertGaugeMetric(group, "HardLimitBytes", 16L);
-        assertGaugeMetric(group, "TotalStorageUsedBytes", VOLUME_CAPACITY - availableBytes);
-
-        // the mbean name is part of the public api
-        MetricName name = group.firstKey();
-        String expectedMbeanName = String.format("io.strimzi.kafka.quotas:type=StorageChecker,name=%s", name.getName());
-        assertEquals(expectedMbeanName, name.getMBeanName(), "unexpected mbean name");
-
-        quotaCallback.close();
-    }
-
-    @Test
     void staticQuotaMetrics() {
 
         target.configure(Map.of(
