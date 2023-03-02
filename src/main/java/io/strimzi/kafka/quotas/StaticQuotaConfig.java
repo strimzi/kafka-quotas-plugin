@@ -23,6 +23,8 @@ import org.slf4j.Logger;
 import static org.apache.kafka.common.config.ConfigDef.Importance.HIGH;
 import static org.apache.kafka.common.config.ConfigDef.Importance.LOW;
 import static org.apache.kafka.common.config.ConfigDef.Importance.MEDIUM;
+import static org.apache.kafka.common.config.ConfigDef.Range.atLeast;
+import static org.apache.kafka.common.config.ConfigDef.Range.between;
 import static org.apache.kafka.common.config.ConfigDef.Type.DOUBLE;
 import static org.apache.kafka.common.config.ConfigDef.Type.INT;
 import static org.apache.kafka.common.config.ConfigDef.Type.LIST;
@@ -41,6 +43,7 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String EXCLUDED_PRINCIPAL_NAME_LIST_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".excluded.principal.name.list";
     static final String STORAGE_CHECK_INTERVAL_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.check-interval";
     static final String AVAILABLE_BYTES_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.bytes";
+    static final String AVAILABLE_RATIO_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.ratio";
     static final String ADMIN_BOOTSTRAP_SERVER_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.bootstrap.servers";
     private final KafkaClientConfig kafkaClientConfig;
     private final boolean supportsKip827;
@@ -69,7 +72,8 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(REQUEST_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Request processing time quota (in seconds)")
                         .define(EXCLUDED_PRINCIPAL_NAME_LIST_PROP, LIST, List.of(), MEDIUM, "List of principals that are excluded from the quota")
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
-                        .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrGreaterThanZeroValidator(), MEDIUM, "Stop message production if availableBytes <= this value"),
+                        .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrInRangeValidator(atLeast(0)), MEDIUM, "Stop message production if availableBytes <= this value")
+                        .define(AVAILABLE_RATIO_PROP, DOUBLE, null, nullOrInRangeValidator(between(0.0, 1.0)), MEDIUM, "Stop message production if availableBytes / capacityBytes <= this value"),
                 props,
                 doLog);
         this.supportsKip827 = supportsKip827;
@@ -102,6 +106,10 @@ public class StaticQuotaConfig extends AbstractConfig {
         return Optional.ofNullable(getLong(AVAILABLE_BYTES_PROP));
     }
 
+    Optional<Double> getAvailableRatioLimit() {
+        return Optional.ofNullable(getDouble(AVAILABLE_RATIO_PROP));
+    }
+
     int getStorageCheckInterval() {
         return getInt(STORAGE_CHECK_INTERVAL_PROP);
     }
@@ -118,13 +126,12 @@ public class StaticQuotaConfig extends AbstractConfig {
         return supportsKip827;
     }
 
-    private static ConfigDef.LambdaValidator nullOrGreaterThanZeroValidator() {
-        ConfigDef.Range atLeast = ConfigDef.Range.atLeast(0);
+    private static ConfigDef.LambdaValidator nullOrInRangeValidator(ConfigDef.Range range) {
         return ConfigDef.LambdaValidator.with((name, value) -> {
             if (value != null) {
-                atLeast.ensureValid(name, value);
+                range.ensureValid(name, value);
             }
-        }, atLeast::toString);
+        }, range::toString);
     }
 
     static class KafkaClientConfig extends AbstractConfig {

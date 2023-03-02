@@ -69,6 +69,17 @@ public class VolumeUsage {
         return capacity - availableBytes;
     }
 
+    /**
+     *
+     * @return The ratio of available bytes to capacity bytes (0.0 if capacity is 0 bytes).
+     */
+    public double getAvailableRatio() {
+        if (capacity == 0) {
+            return 0;
+        }
+        return (double) availableBytes / capacity;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
