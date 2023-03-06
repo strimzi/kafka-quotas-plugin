@@ -5,6 +5,10 @@
 
 package io.strimzi.kafka.quotas.throttle;
 
+import io.strimzi.kafka.quotas.throttle.fallback.ExpiryPolicy;
+
+import java.time.Instant;
+
 /**
  * An implementation of {@link ThrottleFactorSource} which applies no limits.
  */
@@ -19,7 +23,7 @@ public class UnlimitedThrottleFactorSource implements ThrottleFactorSource {
     }
 
     @Override
-    public double currentThrottleFactor() {
-        return 1.0;
+    public ThrottleFactor currentThrottleFactor() {
+        return ThrottleFactor.validFactor(1.0, Instant.now(), ExpiryPolicy.NEVER_EXPIRES);
     }
 }

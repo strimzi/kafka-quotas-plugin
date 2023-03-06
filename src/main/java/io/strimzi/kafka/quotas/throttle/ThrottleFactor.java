@@ -15,6 +15,10 @@ import java.time.Instant;
  */
 public class ThrottleFactor {
 
+    public Instant getValidFrom() {
+        return validFrom;
+    }
+
     /**
      * The source of the throttle factor:
      * 1. calculated from a valid observation

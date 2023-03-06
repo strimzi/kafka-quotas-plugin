@@ -14,13 +14,14 @@ import java.time.temporal.ChronoUnit;
  */
 public class FixedDurationExpiryPolicy implements ExpiryPolicy {
 
+
+    // TODO make fallback window configurable
     private final Duration fallbackAfter = Duration.of(5, ChronoUnit.MINUTES);
     private final Clock clock;
 
     public FixedDurationExpiryPolicy(Clock clock) {
         this.clock = clock;
     }
-
 
     @Override
     public boolean isExpired(Instant validFrom) {

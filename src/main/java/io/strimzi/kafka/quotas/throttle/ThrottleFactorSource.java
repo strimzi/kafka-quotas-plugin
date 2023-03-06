@@ -12,5 +12,5 @@ public interface ThrottleFactorSource {
     /**
      * @return the currently applicable throttle factor.
      */
-    double currentThrottleFactor();
+    ThrottleFactor currentThrottleFactor();
 }

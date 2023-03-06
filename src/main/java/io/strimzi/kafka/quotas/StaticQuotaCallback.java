@@ -4,6 +4,7 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.time.Clock;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -21,9 +22,11 @@ import com.yammer.metrics.core.MetricName;
 import io.strimzi.kafka.quotas.throttle.AvailableBytesThrottleFactorPolicy;
 import io.strimzi.kafka.quotas.throttle.AvailableRatioThrottleFactorPolicy;
 import io.strimzi.kafka.quotas.throttle.PolicyBasedThrottle;
+import io.strimzi.kafka.quotas.throttle.ThrottleFactor;
 import io.strimzi.kafka.quotas.throttle.ThrottleFactorPolicy;
 import io.strimzi.kafka.quotas.throttle.ThrottleFactorSource;
 import io.strimzi.kafka.quotas.throttle.UnlimitedThrottleFactorSource;
+import io.strimzi.kafka.quotas.throttle.fallback.FixedDurationExpiryPolicy;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
@@ -95,7 +98,8 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
         double quota = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
         if (ClientQuotaType.PRODUCE.equals(quotaType)) {
-            quota = quota * throttleFactorSource.currentThrottleFactor();
+            ThrottleFactor factor = throttleFactorSource.currentThrottleFactor();
+            quota = quota * factor.getThrottleFactor();
         }
         // returning zero would cause a divide by zero in Kafka so we return 1 at minimum
         return Math.max(quota, 1d);
@@ -154,11 +158,13 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             } else {
                 throw new IllegalStateException("storageCheckInterval > 0 but no limit type configured");
             }
-            final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE));
+            FixedDurationExpiryPolicy expiryPolicy = new FixedDurationExpiryPolicy(Clock.systemUTC());
+            final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE), expiryPolicy);
             throttleFactorSource = factorNotifier;
 
             Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(factorNotifier).build();
             backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckInterval, TimeUnit.SECONDS);
+            backgroundScheduler.scheduleWithFixedDelay(factorNotifier::checkForStaleFactor, 0, storageCheckInterval, TimeUnit.SECONDS);
             log.info("Configured quota callback with {}. Storage check interval: {}s", quotaMap, storageCheckInterval);
         } else {
             log.info("Static quota callback configured to never check usage: set {} to a positive value to enable", StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP);
