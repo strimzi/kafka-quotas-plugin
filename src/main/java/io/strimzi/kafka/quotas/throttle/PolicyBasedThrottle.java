@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 import static io.strimzi.kafka.quotas.VolumeUsageObservation.VolumeSourceObservationStatus.SUCCESS;
 
@@ -54,7 +54,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
 
     @Override
     public void observeVolumeUsage(VolumeUsageObservation observedVolumes) {
-        updateFactor(() -> getNewFactor(observedVolumes));
+        updateFactor(current -> getNewFactor(observedVolumes, current));
     }
 
     public void checkForStaleFactor() {
@@ -66,22 +66,30 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
         }
     }
 
-    private void updateFactor(Supplier<ThrottleFactor> throttleFactorSupplier) {
-        ThrottleFactor old = this.throttleFactor;
-        this.throttleFactor = throttleFactorSupplier.get();
-        if (!Objects.equals(old.getThrottleFactor(), this.throttleFactor.getThrottleFactor())) {
-            log.info("Throttle Factor changed from {} to {}, notifying listener", old, this.throttleFactor);
+    private void updateFactor(Function<ThrottleFactor, ThrottleFactor> throttleFactorUpdater) {
+        boolean changed = updateFactorAndCheckIfChanged(throttleFactorUpdater);
+        if (changed) {
             listener.run();
-        } else {
-            log.debug("Throttle Factor unchanged at {}, not notifying listener", throttleFactor);
         }
     }
 
-    private ThrottleFactor getNewFactor(VolumeUsageObservation observedVolumes) {
+    private synchronized boolean updateFactorAndCheckIfChanged(Function<ThrottleFactor, ThrottleFactor> throttleFactorUpdater) {
+        ThrottleFactor currentFactor = this.throttleFactor;
+        throttleFactor = throttleFactorUpdater.apply(currentFactor);
+        boolean changed = !Objects.equals(currentFactor.getThrottleFactor(), throttleFactor.getThrottleFactor());
+        if (changed) {
+            log.info("Throttle Factor changed from {} to {}, notifying listener", currentFactor, throttleFactor);
+        } else {
+            log.debug("Throttle Factor unchanged at {}, not notifying listener", throttleFactor);
+        }
+        return changed;
+    }
+
+    private ThrottleFactor getNewFactor(VolumeUsageObservation observedVolumes, ThrottleFactor current) {
         if (observedVolumes.getStatus() == SUCCESS) {
             return calculateThrottleFactorWithExpiry(observedVolumes);
         } else {
-            return maybeFallback();
+            return maybeFallback(current);
         }
     }
 
@@ -90,12 +98,12 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
         return ThrottleFactor.validFactor(newFactor, clock.instant(), expiryPolicy);
     }
 
-    private ThrottleFactor maybeFallback() {
-        if (throttleFactor.isExpired()) {
+    private ThrottleFactor maybeFallback(ThrottleFactor currentFactor) {
+        if (currentFactor.isExpired()) {
             // TODO make fallback factor configurable
             return ThrottleFactor.fallbackThrottleFactor(0.0, Instant.MAX);
         } else {
-            return throttleFactor;
+            return currentFactor;
         }
     }
 
