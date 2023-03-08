@@ -5,6 +5,7 @@
 package io.strimzi.kafka.quotas;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 
@@ -17,7 +18,7 @@ public class VolumeUsageObservation {
      * @return observed volume usage, this is empty if the status is not SUCCESS
      */
     public Collection<VolumeUsage> getVolumeUsages() {
-        return volumeUsages;
+        return Collections.unmodifiableCollection(volumeUsages);
     }
 
     /**
@@ -25,14 +26,6 @@ public class VolumeUsageObservation {
      */
     public VolumeSourceObservationStatus getStatus() {
         return status;
-    }
-
-    /**
-     *
-     * @return it's the throwable
-     */
-    public Throwable getThrowable() {
-        return throwable;
     }
 
     /**
@@ -111,6 +104,7 @@ public class VolumeUsageObservation {
         return "VolumeUsageObservation{" +
                 "volumeUsages=" + volumeUsages +
                 ", status=" + status +
+                ", throwable=" + throwable +
                 '}';
     }
 }
