@@ -15,10 +15,6 @@ import java.time.Instant;
  */
 public class ThrottleFactor {
 
-    public Instant getValidFrom() {
-        return validFrom;
-    }
-
     /**
      * The source of the throttle factor:
      * 1. calculated from a valid observation
@@ -55,15 +51,15 @@ public class ThrottleFactor {
         return throttleFactor;
     }
 
+    /**
+     * @return true if expired
+     */
     public boolean isExpired() {
         return expiryPolicy.isExpired(validFrom);
     }
-    /**
-     *
-     * @return the source of the throttle factor
-     */
-    public ThrottleFactorSource getSource() {
-        return source;
+
+    Instant getValidFrom() {
+        return validFrom;
     }
 
     @Override
@@ -88,10 +84,9 @@ public class ThrottleFactor {
 
     /**
      * @param throttleFactor the factor to apply
-     * @param validFrom      validFrom
      * @return a throttle factor from fallback
      */
-    public static ThrottleFactor fallbackThrottleFactor(double throttleFactor, Instant validFrom) {
-        return new ThrottleFactor(throttleFactor, ThrottleFactorSource.FALLBACK, validFrom, ExpiryPolicy.NEVER_EXPIRES);
+    public static ThrottleFactor fallbackThrottleFactor(double throttleFactor) {
+        return new ThrottleFactor(throttleFactor, ThrottleFactorSource.FALLBACK, Instant.now(), ExpiryPolicy.NEVER_EXPIRES);
     }
 }

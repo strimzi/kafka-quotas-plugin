@@ -35,7 +35,7 @@ class PolicyBasedThrottleTest {
     @BeforeEach
     void setUp() {
         clock = new TickingClock();
-        policyBasedThrottle = new PolicyBasedThrottle(THROTTLE_FACTOR_POLICY, runnable, clock, expiryPolicy);
+        policyBasedThrottle = new PolicyBasedThrottle(THROTTLE_FACTOR_POLICY, runnable, clock, expiryPolicy, 0.0);
         assertThat(policyBasedThrottle.currentThrottleFactor().getThrottleFactor()).isEqualTo(1.0d);
     }
 
@@ -108,7 +108,7 @@ class PolicyBasedThrottleTest {
     }
 
     private static void whenCheckForStaleFactor(PolicyBasedThrottle policyBasedThrottle) {
-        policyBasedThrottle.checkForStaleFactor();
+        policyBasedThrottle.checkThrottleFactorValidity();
     }
 
     private void thenFactorUpdatedToFallback(PolicyBasedThrottle policyBasedThrottle) {

@@ -11,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
-import java.time.Instant;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -29,22 +28,25 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
     private final Runnable listener;
     private final Clock clock;
     private volatile ThrottleFactor throttleFactor;
+    private final double fallbackThrottleFactor;
 
     /**
      * @param factorPolicy Which policy to apply
      * @param listener     the lister to be notified of changes
      * @param expiryPolicy expiry policy to control how long a factor is applied for
+     * @param fallbackThrottleFactor throttle factor to apply if a factor reaches its expiry
      */
-    public PolicyBasedThrottle(ThrottleFactorPolicy factorPolicy, Runnable listener, ExpiryPolicy expiryPolicy) {
-        this(factorPolicy, listener, Clock.systemUTC(), expiryPolicy);
+    public PolicyBasedThrottle(ThrottleFactorPolicy factorPolicy, Runnable listener, ExpiryPolicy expiryPolicy, double fallbackThrottleFactor) {
+        this(factorPolicy, listener, Clock.systemUTC(), expiryPolicy, fallbackThrottleFactor);
     }
 
-    PolicyBasedThrottle(ThrottleFactorPolicy factorPolicy, Runnable listener, Clock clock, ExpiryPolicy expiryPolicy) {
+    PolicyBasedThrottle(ThrottleFactorPolicy factorPolicy, Runnable listener, Clock clock, ExpiryPolicy expiryPolicy, double fallbackThrottleFactor) {
         this.factorPolicy = factorPolicy;
         this.listener = listener;
         this.clock = clock;
         this.expiryPolicy = expiryPolicy;
         throttleFactor = ThrottleFactor.validFactor(1.0d, clock.instant(), this.expiryPolicy);
+        this.fallbackThrottleFactor = fallbackThrottleFactor;
     }
 
     @Override
@@ -57,8 +59,11 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
         updateFactor(current -> getNewFactor(observedVolumes, current));
     }
 
-    public void checkForStaleFactor() {
-        log.info("checking for stale factor");
+    /**
+     * Check for expired factor and fallback if it has expired.
+     */
+    public void checkThrottleFactorValidity() {
+        log.info("checking for expired factor");
         try {
             updateFactor(this::maybeFallback);
         } catch (Exception e) {
@@ -100,8 +105,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
 
     private ThrottleFactor maybeFallback(ThrottleFactor currentFactor) {
         if (currentFactor.isExpired()) {
-            // TODO make fallback factor configurable
-            return ThrottleFactor.fallbackThrottleFactor(0.0, Instant.MAX);
+            return ThrottleFactor.fallbackThrottleFactor(fallbackThrottleFactor);
         } else {
             return currentFactor;
         }

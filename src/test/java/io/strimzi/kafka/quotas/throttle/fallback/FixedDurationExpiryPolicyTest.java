@@ -25,7 +25,7 @@ class FixedDurationExpiryPolicyTest {
     void setUp() {
         clock = new TickingClock();
         start = clock.instant();
-        expiryPolicy = new FixedDurationExpiryPolicy(clock);
+        expiryPolicy = new FixedDurationExpiryPolicy(clock, Duration.of(5, ChronoUnit.MINUTES));
     }
 
     @Test

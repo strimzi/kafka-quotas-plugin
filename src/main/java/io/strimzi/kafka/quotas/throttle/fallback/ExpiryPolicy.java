@@ -11,7 +11,15 @@ import java.time.Instant;
  */
 public interface ExpiryPolicy {
 
+    /**
+     * An expiry policy that will never expire input
+     */
     ExpiryPolicy NEVER_EXPIRES = expiresAt -> false;
 
+    /**
+     * Given a validFrom instant return true if it is no longer
+     * @param validFrom the instant something became valid/applied
+     * @return true if validFrom is no longer
+     */
     boolean isExpired(Instant validFrom);
 }

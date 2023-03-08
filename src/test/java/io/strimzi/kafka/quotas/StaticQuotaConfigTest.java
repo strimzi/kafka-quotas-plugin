@@ -5,14 +5,15 @@
 
 package io.strimzi.kafka.quotas;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.common.config.ConfigException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 
 import static io.strimzi.kafka.quotas.StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,6 +69,84 @@ class StaticQuotaConfigTest {
         assertThatThrownBy(() -> new StaticQuotaConfig(Map.of(StaticQuotaConfig.AVAILABLE_BYTES_PROP, "-1"), true))
                 .isInstanceOf(ConfigException.class)
                 .hasMessageContaining("Invalid value -1");
+    }
+
+    @Test
+    void invalidThrottleValidityDurationNotAllowed() {
+        //When
+        assertThatThrownBy(() -> new StaticQuotaConfig(Map.of(StaticQuotaConfig.THROTTLE_FALLBACK_VALIDITY_DURATION, "NOT 8601 FRIENDLY"), true))
+                .isInstanceOf(ConfigException.class)
+                .hasMessageContaining("Invalid value NOT 8601 FRIENDLY");
+    }
+
+    @Test
+    void validThrottleValidityDurationAllowed() {
+        //Given
+        HashMap<String, String> props = new HashMap<>(defaultProps);
+        props.put(StaticQuotaConfig.THROTTLE_FALLBACK_VALIDITY_DURATION, "PT10M");
+
+        //When
+        StaticQuotaConfig config = new StaticQuotaConfig(props, true);
+
+        //Then
+        assertThat(config.getThrottleFactorValidityDuration()).isEqualTo(Duration.ofMinutes(10));
+    }
+
+    @Test
+    void validFallbackThrottleFactorAllowed() {
+
+        testValidFallbackThrottleFactor("0.5", 0.5d);
+    }
+
+    @Test
+    void validFallbackThrottleFactorZeroAllowed() {
+        //Given
+        testValidFallbackThrottleFactor("0", 0d);
+    }
+
+    @Test
+    void validFallbackThrottleFactorOneAllowed() {
+        //Given
+        testValidFallbackThrottleFactor("1", 1d);
+    }
+
+    private void testValidFallbackThrottleFactor(String property, double expected) {
+        //Given
+        HashMap<String, String> props = new HashMap<>(defaultProps);
+        props.put(StaticQuotaConfig.FALLBACK_THROTTLE_FACTOR, property);
+
+        //When
+        StaticQuotaConfig config = new StaticQuotaConfig(props, true);
+
+        //Then
+        assertThat(config.getFallbackThrottleFactor()).isEqualTo(expected);
+    }
+
+    @Test
+    void negativeFallbackThrottleFactorNotAllowed() {
+        testInvalidFallbackThrottleFactor("-0.001");
+    }
+
+    @Test
+    void fallbackThrottleFactorOverOneNotAllowed() {
+        testInvalidFallbackThrottleFactor("1.001");
+    }
+
+    private static void testInvalidFallbackThrottleFactor(String prop) {
+        //When
+        assertThatThrownBy(() -> new StaticQuotaConfig(Map.of(StaticQuotaConfig.FALLBACK_THROTTLE_FACTOR, prop), true))
+                .isInstanceOf(ConfigException.class)
+                .hasMessageContaining("Invalid value " + prop);
+    }
+
+    @Test
+    void testDefaultValues() {
+        //When
+        StaticQuotaConfig config = new StaticQuotaConfig(defaultProps, true);
+
+        //Then
+        assertThat(config.getThrottleFactorValidityDuration()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(config.getFallbackThrottleFactor()).isEqualTo(1.0d);
     }
 
     @Test
