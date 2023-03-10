@@ -40,7 +40,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
         this(factorPolicy, listener, Clock.systemUTC(), expiryPolicy, fallbackThrottleFactor);
     }
 
-    PolicyBasedThrottle(ThrottleFactorPolicy factorPolicy, Runnable listener, Clock clock, ExpiryPolicy expiryPolicy, double fallbackThrottleFactor) {
+    /* test */ PolicyBasedThrottle(ThrottleFactorPolicy factorPolicy, Runnable listener, Clock clock, ExpiryPolicy expiryPolicy, double fallbackThrottleFactor) {
         this.factorPolicy = factorPolicy;
         this.listener = listener;
         this.clock = clock;
