@@ -78,7 +78,7 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
                         .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrInRangeValidator(atLeast(0)), MEDIUM, "Stop message production if availableBytes <= this value")
                         .define(AVAILABLE_RATIO_PROP, DOUBLE, null, nullOrInRangeValidator(between(0.0, 1.0)), MEDIUM, "Stop message production if availableBytes / capacityBytes <= this value")
-                        .define(THROTTLE_FALLBACK_VALIDITY_DURATION, STRING, "PT5M", iso8601DurationValidator(), MEDIUM, "Stop message production if availableBytes / capacityBytes <= this value")
+                        .define(THROTTLE_FALLBACK_VALIDITY_DURATION, STRING, "PT5M", iso8601DurationValidator(), MEDIUM, "How long a throttle factor derived from a successful observation of the cluster should be applied (iso8601 duration)")
                         .define(FALLBACK_THROTTLE_FACTOR, DOUBLE, 1.0, nullOrInRangeValidator(between(0.0, 1.0)), MEDIUM, "Fallback throttle factor to apply if current factor expires"),
                 props,
                 doLog);
