@@ -4,7 +4,7 @@
  */
 package io.strimzi.kafka.quotas.throttle.fallback;
 
-import io.strimzi.kafka.quotas.TickingClock;
+import io.strimzi.kafka.quotas.TickableClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -17,13 +17,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FixedDurationExpiryPolicyTest {
 
 
-    private TickingClock clock;
+    private TickableClock clock;
     private Instant start;
     private FixedDurationExpiryPolicy expiryPolicy;
 
     @BeforeEach
     void setUp() {
-        clock = new TickingClock();
+        clock = new TickableClock();
         start = clock.instant();
         expiryPolicy = new FixedDurationExpiryPolicy(clock, Duration.of(5, ChronoUnit.MINUTES));
     }

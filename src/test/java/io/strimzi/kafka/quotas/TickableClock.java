@@ -10,10 +10,13 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 
-public class TickingClock extends Clock {
+/**
+ * A mutable fixed Clock where the current instant is programmatically updated with {@link TickableClock#tick(Duration)}
+ */
+public class TickableClock extends Clock {
     private Clock baseClock;
 
-    public TickingClock() {
+    public TickableClock() {
         this.baseClock = Clock.fixed(Instant.now(), ZoneOffset.UTC);
     }
 

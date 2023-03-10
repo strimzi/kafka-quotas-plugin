@@ -4,7 +4,7 @@
  */
 package io.strimzi.kafka.quotas.throttle;
 
-import io.strimzi.kafka.quotas.TickingClock;
+import io.strimzi.kafka.quotas.TickableClock;
 import io.strimzi.kafka.quotas.VolumeUsage;
 import io.strimzi.kafka.quotas.VolumeUsageResult;
 import io.strimzi.kafka.quotas.throttle.fallback.ExpiryPolicy;
@@ -30,11 +30,11 @@ class PolicyBasedThrottleTest {
 
     private ExpiryPolicy expiryPolicy = Mockito.mock(ExpiryPolicy.class);
     private PolicyBasedThrottle policyBasedThrottle;
-    private TickingClock clock;
+    private TickableClock clock;
 
     @BeforeEach
     void setUp() {
-        clock = new TickingClock();
+        clock = new TickableClock();
         policyBasedThrottle = new PolicyBasedThrottle(THROTTLE_FACTOR_POLICY, runnable, clock, expiryPolicy, 0.0);
         assertThat(policyBasedThrottle.currentThrottleFactor().getThrottleFactor()).isEqualTo(1.0d);
     }

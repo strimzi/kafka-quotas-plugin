@@ -9,7 +9,7 @@ import java.time.Duration;
 import java.time.Instant;
 
 /**
- * Produces an expiry instant a fixed duration after an input instant
+ * Determines if a fixed duration has elapsed since a given instant
  */
 public class FixedDurationExpiryPolicy implements ExpiryPolicy {
 
