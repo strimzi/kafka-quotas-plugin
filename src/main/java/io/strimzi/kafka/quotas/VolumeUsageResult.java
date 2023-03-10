@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * The result of an observation of the volumes in your kafka cluster.
  */
-public class VolumeUsageObservation {
+public class VolumeUsageResult {
 
     /**
      * @return observed volume usage, this is empty if the status is not SUCCESS
@@ -73,7 +73,7 @@ public class VolumeUsageObservation {
     private final Throwable throwable;
 
 
-    private VolumeUsageObservation(Collection<VolumeUsage> volumeUsages, VolumeSourceObservationStatus status, Throwable throwable) {
+    private VolumeUsageResult(Collection<VolumeUsage> volumeUsages, VolumeSourceObservationStatus status, Throwable throwable) {
         this.volumeUsages = volumeUsages;
         this.status = status;
         this.throwable = throwable;
@@ -83,8 +83,8 @@ public class VolumeUsageObservation {
      * @param volumeUsages the observed usages
      * @return a volume usage observation containing volumeUsages and having a SUCCESS status
      */
-    public static VolumeUsageObservation success(Collection<VolumeUsage> volumeUsages) {
-        return new VolumeUsageObservation(volumeUsages, VolumeSourceObservationStatus.SUCCESS, null);
+    public static VolumeUsageResult success(Collection<VolumeUsage> volumeUsages) {
+        return new VolumeUsageResult(volumeUsages, VolumeSourceObservationStatus.SUCCESS, null);
     }
 
     /**
@@ -92,11 +92,11 @@ public class VolumeUsageObservation {
      * @param cause the exception that caused the failure (nullable)
      * @return a volume usage observation containing volumeUsages and having a non SUCCESS status
      */
-    public static VolumeUsageObservation failure(VolumeSourceObservationStatus status, Throwable cause) {
+    public static VolumeUsageResult failure(VolumeSourceObservationStatus status, Throwable cause) {
         if (status == VolumeSourceObservationStatus.SUCCESS) {
             throw new IllegalArgumentException("success is not a failure");
         }
-        return new VolumeUsageObservation(List.of(), status, cause);
+        return new VolumeUsageResult(List.of(), status, cause);
     }
 
     @Override

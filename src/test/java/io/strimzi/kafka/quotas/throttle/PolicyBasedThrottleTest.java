@@ -6,7 +6,7 @@ package io.strimzi.kafka.quotas.throttle;
 
 import io.strimzi.kafka.quotas.TickingClock;
 import io.strimzi.kafka.quotas.VolumeUsage;
-import io.strimzi.kafka.quotas.VolumeUsageObservation;
+import io.strimzi.kafka.quotas.VolumeUsageResult;
 import io.strimzi.kafka.quotas.throttle.fallback.ExpiryPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
-import static io.strimzi.kafka.quotas.VolumeUsageObservation.VolumeSourceObservationStatus.INTERRUPTED;
+import static io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus.INTERRUPTED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -85,12 +85,12 @@ class PolicyBasedThrottleTest {
     }
 
     private void whenVolumeUsageResultFailureObserved() {
-        policyBasedThrottle.observeVolumeUsage(VolumeUsageObservation.failure(INTERRUPTED, null));
+        policyBasedThrottle.observeVolumeUsage(VolumeUsageResult.failure(INTERRUPTED, null));
     }
 
     private void whenVolumeUsageResultSuccessObserved() {
         VolumeUsage arbitraryUsage = new VolumeUsage("1", "/tmp", 1000, 1000);
-        policyBasedThrottle.observeVolumeUsage(VolumeUsageObservation.success(List.of(arbitraryUsage)));
+        policyBasedThrottle.observeVolumeUsage(VolumeUsageResult.success(List.of(arbitraryUsage)));
     }
 
     private void thenFactorUnchanged() {

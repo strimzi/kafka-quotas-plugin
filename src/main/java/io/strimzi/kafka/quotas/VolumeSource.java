@@ -18,15 +18,15 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.strimzi.kafka.quotas.VolumeUsageObservation.VolumeSourceObservationStatus;
+import io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.LogDirDescription;
 import org.apache.kafka.common.Node;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static io.strimzi.kafka.quotas.VolumeUsageObservation.failure;
-import static io.strimzi.kafka.quotas.VolumeUsageObservation.success;
+import static io.strimzi.kafka.quotas.VolumeUsageResult.failure;
+import static io.strimzi.kafka.quotas.VolumeUsageResult.success;
 import static java.util.stream.Collectors.toSet;
 
 
@@ -63,23 +63,23 @@ public class VolumeSource implements Runnable {
     public void run() {
         try {
             log.info("Updating cluster volume usage.");
-            CompletableFuture<VolumeUsageObservation> volumeObservationPromise = new CompletableFuture<>();
+            CompletableFuture<VolumeUsageResult> volumeUsageResultPromise = new CompletableFuture<>();
             log.debug("Attempting to describe cluster");
             admin.describeCluster().nodes().whenComplete((nodes, throwable) -> {
                 if (throwable != null) {
                     log.error("error while describing cluster", throwable);
-                    volumeObservationPromise.complete(failure(VolumeSourceObservationStatus.DESCRIBE_CLUSTER_ERROR, throwable));
+                    volumeUsageResultPromise.complete(failure(VolumeSourceObservationStatus.DESCRIBE_CLUSTER_ERROR, throwable));
                 } else {
                     if (log.isDebugEnabled()) {
                         log.debug("Successfully described cluster: " + nodes);
                     }
                     //Deliberately stay on the adminClient thread as the next thing we do is another admin API call
-                    onDescribeClusterSuccess(nodes, volumeObservationPromise);
+                    onDescribeClusterSuccess(nodes, volumeUsageResultPromise);
                 }
             });
             //Bring it back to the original thread to do the actual work of the plug-in.
-            final VolumeUsageObservation observation = volumeObservationPromise.get(timeout, timeoutUnit);
-            notifyObserver(observation);
+            final VolumeUsageResult result = volumeUsageResultPromise.get(timeout, timeoutUnit);
+            notifyObserver(result);
             log.info("Updated cluster volume usage.");
         } catch (InterruptedException e) {
             notifyObserver(failure(VolumeSourceObservationStatus.INTERRUPTED, e));
@@ -98,21 +98,21 @@ public class VolumeSource implements Runnable {
 
     }
 
-    private void notifyObserver(VolumeUsageObservation observation) {
+    private void notifyObserver(VolumeUsageResult result) {
         if (log.isDebugEnabled()) {
-            log.debug("Notifying consumers of volumes usage observation: " + observation);
+            log.debug("Notifying consumers of volumes usage result: " + result);
         }
-        volumeObserver.observeVolumeUsage(observation);
+        volumeObserver.observeVolumeUsage(result);
     }
 
-    private void onDescribeClusterSuccess(Collection<Node> nodes, CompletableFuture<VolumeUsageObservation> promise) {
+    private void onDescribeClusterSuccess(Collection<Node> nodes, CompletableFuture<VolumeUsageResult> promise) {
         final Set<Integer> allBrokerIds = nodes.stream().map(Node::id).collect(toSet());
 
         admin.describeLogDirs(allBrokerIds)
                 .allDescriptions()
                 .whenComplete((logDirsPerBroker, throwable) -> {
                     if (throwable != null) {
-                        promise.complete(VolumeUsageObservation.failure(VolumeSourceObservationStatus.DESCRIBE_LOG_DIR_ERROR, throwable));
+                        promise.complete(VolumeUsageResult.failure(VolumeSourceObservationStatus.DESCRIBE_LOG_DIR_ERROR, throwable));
                     } else {
                         if (log.isDebugEnabled()) {
                             log.debug("Successfully described logDirs: " + logDirsPerBroker);

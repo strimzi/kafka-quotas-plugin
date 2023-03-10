@@ -5,7 +5,7 @@
 package io.strimzi.kafka.quotas.throttle;
 
 import io.strimzi.kafka.quotas.VolumeObserver;
-import io.strimzi.kafka.quotas.VolumeUsageObservation;
+import io.strimzi.kafka.quotas.VolumeUsageResult;
 import io.strimzi.kafka.quotas.throttle.fallback.ExpiryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,7 +14,7 @@ import java.time.Clock;
 import java.util.Objects;
 import java.util.function.Function;
 
-import static io.strimzi.kafka.quotas.VolumeUsageObservation.VolumeSourceObservationStatus.SUCCESS;
+import static io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus.SUCCESS;
 
 
 /**
@@ -55,7 +55,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
     }
 
     @Override
-    public void observeVolumeUsage(VolumeUsageObservation observedVolumes) {
+    public void observeVolumeUsage(VolumeUsageResult observedVolumes) {
         updateFactor(current -> getNewFactor(observedVolumes, current));
     }
 
@@ -90,7 +90,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
         return changed;
     }
 
-    private ThrottleFactor getNewFactor(VolumeUsageObservation observedVolumes, ThrottleFactor current) {
+    private ThrottleFactor getNewFactor(VolumeUsageResult observedVolumes, ThrottleFactor current) {
         if (observedVolumes.getStatus() == SUCCESS) {
             return calculateThrottleFactorWithExpiry(observedVolumes);
         } else {
@@ -98,7 +98,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
         }
     }
 
-    private ThrottleFactor calculateThrottleFactorWithExpiry(VolumeUsageObservation observedVolumes) {
+    private ThrottleFactor calculateThrottleFactorWithExpiry(VolumeUsageResult observedVolumes) {
         double newFactor = factorPolicy.calculateFactor(observedVolumes.getVolumeUsages());
         return ThrottleFactor.validFactor(newFactor, clock.instant(), expiryPolicy);
     }

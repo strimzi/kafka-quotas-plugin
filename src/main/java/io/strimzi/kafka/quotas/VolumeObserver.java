@@ -12,7 +12,7 @@ package io.strimzi.kafka.quotas;
 public interface VolumeObserver {
 
     /**
-     * @param observedVolumes a collection of VolumeUsage observations
+     * @param result the result of a VolumeUsage observations
      */
-    void observeVolumeUsage(VolumeUsageObservation observedVolumes);
+    void observeVolumeUsage(VolumeUsageResult result);
 }
