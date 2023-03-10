@@ -164,7 +164,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
             Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(factorNotifier).build();
             backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckInterval, TimeUnit.SECONDS);
-            backgroundScheduler.scheduleWithFixedDelay(factorNotifier::checkThrottleFactorValidity, 0, storageCheckInterval, TimeUnit.SECONDS);
+            backgroundScheduler.scheduleWithFixedDelay(factorNotifier::checkThrottleFactorValidity, 0, 10, TimeUnit.SECONDS);
             log.info("Configured quota callback with {}. Storage check interval: {}s", quotaMap, storageCheckInterval);
         } else {
             log.info("Static quota callback configured to never check usage: set {} to a positive value to enable", StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP);

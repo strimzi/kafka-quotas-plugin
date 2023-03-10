@@ -45,8 +45,10 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class StaticQuotaCallbackTest {
 
-    public static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10, StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", StaticQuotaConfig.AVAILABLE_BYTES_PROP, "2");
+    private static final int STORAGE_CHECK_INTERVAL = 20;
+    private static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, STORAGE_CHECK_INTERVAL, StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", StaticQuotaConfig.AVAILABLE_BYTES_PROP, "2");
     private static final long VOLUME_CAPACITY = 50;
+    public static final long THROTTLE_FACTOR_EXPIRY_INTERVAL = 10L;
 
     @Mock(lenient = true)
     VolumeSourceBuilder volumeSourceBuilder;
@@ -181,7 +183,8 @@ class StaticQuotaCallbackTest {
         target.configure(MINIMUM_EXECUTABLE_CONFIG);
 
         //Verify
-        verify(scheduledExecutorService, times(2)).scheduleWithFixedDelay(any(), eq(0L), eq(10L), eq(TimeUnit.SECONDS));
+        verify(scheduledExecutorService).scheduleWithFixedDelay(any(), eq(0L), eq((long) STORAGE_CHECK_INTERVAL), eq(TimeUnit.SECONDS));
+        verify(scheduledExecutorService).scheduleWithFixedDelay(any(), eq(0L), eq(THROTTLE_FACTOR_EXPIRY_INTERVAL), eq(TimeUnit.SECONDS));
     }
 
     @Test
