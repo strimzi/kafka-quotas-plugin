@@ -9,9 +9,12 @@ import io.strimzi.kafka.quotas.throttle.fallback.ExpiryPolicy;
 import java.time.Instant;
 
 /**
- * Represents a throttle factor, when it was created and indicates the source:
+ * Represents a throttle factor, when it was created, it's expiry policy and indicates the source:
  * 1. from a valid observation of the cluster volumes
  * 2. from fallback, a throttle factor produced because we could not successfully observe the cluster
+ * <p>
+ * The expiry policy determines if this ThrottleFactor has expired (is no longer valid to be applied)
+ * </p>
  */
 public class ThrottleFactor {
 
