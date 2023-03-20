@@ -4,6 +4,14 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.time.Duration;
+import java.time.format.DateTimeParseException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.LogDirDescription;
@@ -13,14 +21,6 @@ import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.server.quota.ClientQuotaType;
 import org.slf4j.Logger;
-
-import java.time.Duration;
-import java.time.format.DateTimeParseException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
 
 import static org.apache.kafka.common.config.ConfigDef.Importance.HIGH;
 import static org.apache.kafka.common.config.ConfigDef.Importance.LOW;
@@ -46,8 +46,8 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String STORAGE_CHECK_INTERVAL_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.check-interval";
     static final String AVAILABLE_BYTES_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.bytes";
     static final String AVAILABLE_RATIO_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.ratio";
-    static final String FALLBACK_THROTTLE_FACTOR = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".throttle.factor.fallback";
-    static final String THROTTLE_FALLBACK_VALIDITY_DURATION = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".throttle.factor.validity.duration";
+    static final String FALLBACK_THROTTLE_FACTOR_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".throttle.factor.fallback";
+    static final String THROTTLE_FALLBACK_VALIDITY_DURATION_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".throttle.factor.validity.duration";
     static final String ADMIN_BOOTSTRAP_SERVER_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.bootstrap.servers";
     private final KafkaClientConfig kafkaClientConfig;
     private final boolean supportsKip827;
@@ -78,8 +78,8 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
                         .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrInRangeValidator(atLeast(0)), MEDIUM, "Stop message production if availableBytes <= this value")
                         .define(AVAILABLE_RATIO_PROP, DOUBLE, null, nullOrInRangeValidator(between(0.0, 1.0)), MEDIUM, "Stop message production if availableBytes / capacityBytes <= this value")
-                        .define(THROTTLE_FALLBACK_VALIDITY_DURATION, STRING, "PT5M", iso8601DurationValidator(), MEDIUM, "How long a throttle factor derived from a successful observation of the cluster should be applied (iso8601 duration)")
-                        .define(FALLBACK_THROTTLE_FACTOR, DOUBLE, 1.0, nullOrInRangeValidator(between(0.0, 1.0)), MEDIUM, "Fallback throttle factor to apply if current factor expires"),
+                        .define(THROTTLE_FALLBACK_VALIDITY_DURATION_PROP, STRING, "PT5M", iso8601DurationValidator(), MEDIUM, "How long a throttle factor derived from a successful observation of the cluster should be applied (iso8601 duration)")
+                        .define(FALLBACK_THROTTLE_FACTOR_PROP, DOUBLE, 1.0, nullOrInRangeValidator(between(0.0, 1.0)), MEDIUM, "Fallback throttle factor to apply if current factor expires"),
                 props,
                 doLog);
         this.supportsKip827 = supportsKip827;
@@ -133,11 +133,11 @@ public class StaticQuotaConfig extends AbstractConfig {
     }
 
     double getFallbackThrottleFactor() {
-        return getDouble(FALLBACK_THROTTLE_FACTOR);
+        return getDouble(FALLBACK_THROTTLE_FACTOR_PROP);
     }
 
     Duration getThrottleFactorValidityDuration() {
-        return Duration.parse(getString(THROTTLE_FALLBACK_VALIDITY_DURATION));
+        return Duration.parse(getString(THROTTLE_FALLBACK_VALIDITY_DURATION_PROP));
     }
 
     private static ConfigDef.LambdaValidator nullOrInRangeValidator(ConfigDef.Range range) {

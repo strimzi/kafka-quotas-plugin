@@ -5,15 +5,15 @@
 
 package io.strimzi.kafka.quotas;
 
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.common.config.ConfigException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
 
 import static io.strimzi.kafka.quotas.StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.fail;
 class StaticQuotaConfigTest {
 
     public static final String ARBITRARY_VALUE = "arbitrary";
-    private Map<String, String> defaultProps = Map.of("broker.id", "1",
+    private final Map<String, String> defaultProps = Map.of("broker.id", "1",
             "client.quota.callback.static.kafka.admin.bootstrap.servers", "localhost:9093");
 
     @ParameterizedTest(name = "shouldResolveListenerProperty: {0}")
@@ -74,7 +74,7 @@ class StaticQuotaConfigTest {
     @Test
     void invalidThrottleValidityDurationNotAllowed() {
         //When
-        assertThatThrownBy(() -> new StaticQuotaConfig(Map.of(StaticQuotaConfig.THROTTLE_FALLBACK_VALIDITY_DURATION, "NOT 8601 FRIENDLY"), true))
+        assertThatThrownBy(() -> new StaticQuotaConfig(Map.of(StaticQuotaConfig.THROTTLE_FALLBACK_VALIDITY_DURATION_PROP, "NOT 8601 FRIENDLY"), true))
                 .isInstanceOf(ConfigException.class)
                 .hasMessageContaining("Invalid value NOT 8601 FRIENDLY");
     }
@@ -83,7 +83,7 @@ class StaticQuotaConfigTest {
     void validThrottleValidityDurationAllowed() {
         //Given
         HashMap<String, String> props = new HashMap<>(defaultProps);
-        props.put(StaticQuotaConfig.THROTTLE_FALLBACK_VALIDITY_DURATION, "PT10M");
+        props.put(StaticQuotaConfig.THROTTLE_FALLBACK_VALIDITY_DURATION_PROP, "PT10M");
 
         //When
         StaticQuotaConfig config = new StaticQuotaConfig(props, true);
@@ -113,7 +113,7 @@ class StaticQuotaConfigTest {
     private void testValidFallbackThrottleFactor(String property, double expected) {
         //Given
         HashMap<String, String> props = new HashMap<>(defaultProps);
-        props.put(StaticQuotaConfig.FALLBACK_THROTTLE_FACTOR, property);
+        props.put(StaticQuotaConfig.FALLBACK_THROTTLE_FACTOR_PROP, property);
 
         //When
         StaticQuotaConfig config = new StaticQuotaConfig(props, true);
@@ -134,7 +134,7 @@ class StaticQuotaConfigTest {
 
     private static void testInvalidFallbackThrottleFactor(String prop) {
         //When
-        assertThatThrownBy(() -> new StaticQuotaConfig(Map.of(StaticQuotaConfig.FALLBACK_THROTTLE_FACTOR, prop), true))
+        assertThatThrownBy(() -> new StaticQuotaConfig(Map.of(StaticQuotaConfig.FALLBACK_THROTTLE_FACTOR_PROP, prop), true))
                 .isInstanceOf(ConfigException.class)
                 .hasMessageContaining("Invalid value " + prop);
     }
