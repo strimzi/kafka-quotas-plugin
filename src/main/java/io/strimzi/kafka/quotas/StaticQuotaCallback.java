@@ -101,7 +101,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             ThrottleFactor factor = throttleFactorSource.currentThrottleFactor();
             quota = quota * factor.getThrottleFactor();
         }
-        // returning zero would cause a divide by zero in Kafka so we return 1 at minimum
+        // returning zero would cause a divide by zero in Kafka, so we return 1 at minimum
         return Math.max(quota, 1d);
     }
 

@@ -48,12 +48,12 @@ public class VolumeUsageResult {
         SAFETY_TIMEOUT,
 
         /**
-         * there was an error describing the cluster, it's future completed exceptionally
+         * there was an error describing the cluster, its future completed exceptionally
          */
         DESCRIBE_CLUSTER_ERROR,
 
         /**
-         * there was an error describing the log dirs, it's future completed exceptionally
+         * there was an error describing the log dirs, its future completed exceptionally
          */
         DESCRIBE_LOG_DIR_ERROR,
 
