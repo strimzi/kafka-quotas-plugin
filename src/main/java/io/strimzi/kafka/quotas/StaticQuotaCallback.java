@@ -46,8 +46,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private static final String EXCLUDED_PRINCIPAL_QUOTA_KEY = "excluded-principal-quota-key";
 
     private volatile Map<ClientQuotaType, Quota> quotaMap = new HashMap<>();
-    private volatile long storageQuotaSoft = Long.MAX_VALUE;
-    private volatile long storageQuotaHard = Long.MAX_VALUE;
     private volatile List<String> excludedPrincipalNameList = List.of();
     private final Set<ClientQuotaType> resetQuota = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private volatile ThrottleFactorSource throttleFactorSource = UnlimitedThrottleFactorSource.UNLIMITED_THROTTLE_FACTOR_SOURCE;
@@ -135,7 +133,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
     }
 
-    @SuppressWarnings("deprecation")
     @Override
     public void configure(Map<String, ?> configs) {
         StaticQuotaConfig config = new StaticQuotaConfig(configs, true);
