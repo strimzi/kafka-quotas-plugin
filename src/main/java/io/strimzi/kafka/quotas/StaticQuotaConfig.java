@@ -154,9 +154,9 @@ public class StaticQuotaConfig extends AbstractConfig {
             try {
                 Duration.parse(duration);
             } catch (DateTimeParseException ex) {
-                throw new ConfigException(name, value, "failed to parse iso8601 duration");
+                throw new ConfigException(name, value, "Failed to parse iso8601 duration");
             }
-        }, () -> "should be a valid iso8601 duration string like PT5M");
+        }, () -> "Should be a valid iso8601 duration string like PT5M");
     }
 
 
@@ -186,7 +186,7 @@ public class StaticQuotaConfig extends AbstractConfig {
         public Map<String, Object> getKafkaClientConfig() {
             Map<String, Object> configuredProperties = originalsWithPrefix(ADMIN_CONFIG_PREFIX, true);
             configuredProperties.computeIfAbsent(AdminClientConfig.CLIENT_ID_CONFIG, this::generateClientId);
-            log.info("resolved kafka config of {}", configuredProperties);
+            log.info("Resolved kafka config of {}", configuredProperties);
             return configuredProperties;
         }
 

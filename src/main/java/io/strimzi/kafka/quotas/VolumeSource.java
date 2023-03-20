@@ -67,7 +67,7 @@ public class VolumeSource implements Runnable {
             log.debug("Attempting to describe cluster");
             admin.describeCluster().nodes().whenComplete((nodes, throwable) -> {
                 if (throwable != null) {
-                    log.error("error while describing cluster", throwable);
+                    log.error("Error while describing cluster", throwable);
                     volumeUsageResultPromise.complete(failure(VolumeSourceObservationStatus.DESCRIBE_CLUSTER_ERROR, throwable));
                 } else {
                     if (log.isDebugEnabled()) {

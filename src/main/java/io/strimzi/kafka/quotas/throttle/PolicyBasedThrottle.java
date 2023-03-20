@@ -4,15 +4,15 @@
  */
 package io.strimzi.kafka.quotas.throttle;
 
+import java.time.Clock;
+import java.util.Objects;
+import java.util.function.Function;
+
 import io.strimzi.kafka.quotas.VolumeObserver;
 import io.strimzi.kafka.quotas.VolumeUsageResult;
 import io.strimzi.kafka.quotas.throttle.fallback.ExpiryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.Clock;
-import java.util.Objects;
-import java.util.function.Function;
 
 import static io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus.SUCCESS;
 
@@ -63,11 +63,11 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
      * Check for expired factor and fallback if it has expired.
      */
     public void checkThrottleFactorValidity() {
-        log.info("checking for expired factor");
+        log.info("Checking for expired factor");
         try {
             updateFactor(this::maybeFallback);
         } catch (Exception e) {
-            log.warn("failed to check for stale factor", e);
+            log.warn("Failed to check for stale factor", e);
         }
     }
 
