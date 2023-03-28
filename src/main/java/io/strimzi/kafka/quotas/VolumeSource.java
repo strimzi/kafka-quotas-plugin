@@ -112,7 +112,7 @@ public class VolumeSource implements Runnable {
                 .allDescriptions()
                 .whenComplete((logDirsPerBroker, throwable) -> {
                     if (throwable != null) {
-                        promise.complete(VolumeUsageResult.failure(VolumeSourceObservationStatus.DESCRIBE_LOG_DIR_ERROR, throwable));
+                        promise.complete(failure(VolumeSourceObservationStatus.DESCRIBE_LOG_DIR_ERROR, throwable));
                     } else {
                         if (log.isDebugEnabled()) {
                             log.debug("Successfully described logDirs: " + logDirsPerBroker);
