@@ -6,6 +6,7 @@
 package io.strimzi.kafka.quotas;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,7 @@ import org.apache.kafka.clients.admin.DescribeLogDirsResult;
 import org.apache.kafka.clients.admin.LogDirDescription;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.Node;
+import org.apache.kafka.common.internals.KafkaFutureImpl;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,19 +44,96 @@ class VolumeSourceTest {
     private final Map<Integer, Map<String, LogDirDescription>> descriptions = new HashMap<>();
 
     private final List<Node> nodes = Lists.newArrayList();
+    @Mock(lenient = true)
+    private DescribeClusterResult describeClusterResult;
+
+    @Mock(lenient = true)
+    private DescribeLogDirsResult describeLogDirsResult;
 
     @BeforeEach
     void setUp() {
         capturingVolumeObserver = new CapturingVolumeObserver();
-        volumeSource = new VolumeSource(admin, capturingVolumeObserver, 1, TimeUnit.SECONDS);
-        final DescribeClusterResult mockDescribeClusterResult = mock(DescribeClusterResult.class);
-        when(mockDescribeClusterResult.nodes()).thenReturn(KafkaFuture.completedFuture(nodes));
-        when(admin.describeCluster()).thenReturn(mockDescribeClusterResult);
-        DescribeLogDirsResult mockDescribeLogDirsResult = mock(DescribeLogDirsResult.class);
-        when(mockDescribeLogDirsResult.allDescriptions()).thenReturn(KafkaFuture.completedFuture(descriptions));
-        when(admin.describeLogDirs(argThat(integers ->
-                integers.equals(nodes.stream().map(Node::id).collect(Collectors.toSet())))))
-                .thenReturn(mockDescribeLogDirsResult);
+        volumeSource = new VolumeSource(admin, capturingVolumeObserver, 0, TimeUnit.SECONDS);
+        when(describeClusterResult.nodes()).thenReturn(KafkaFuture.completedFuture(nodes));
+        when(admin.describeCluster()).thenReturn(describeClusterResult);
+        when(describeLogDirsResult.allDescriptions()).thenReturn(KafkaFuture.completedFuture(descriptions));
+        lenient().when(admin.describeLogDirs(argThat(integers ->
+                        integers.equals(nodes.stream().map(Node::id).collect(Collectors.toSet())))))
+                .thenReturn(describeLogDirsResult);
+    }
+
+    @Test
+    void shouldProduceFailedObservationIfDescribeClusterFails() {
+        //Given
+        final KafkaFutureImpl<Collection<Node>> kafkaFuture = new KafkaFutureImpl<>();
+        kafkaFuture.completeExceptionally(new RuntimeException("boom"));
+        when(describeClusterResult.nodes()).thenReturn(kafkaFuture);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
+        assertVolumeUsageStatus(results, VolumeSourceObservationStatus.DESCRIBE_CLUSTER_ERROR);
+    }
+
+
+    @Test
+    void shouldProduceFailedObservationIfDescribeClusterThrows() {
+        //Given
+        when(describeClusterResult.nodes()).thenThrow(new RuntimeException("boom"));
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
+        assertVolumeUsageStatus(results, VolumeSourceObservationStatus.EXCEPTION);
+    }
+
+
+    @Test
+    void shouldProduceFailedObservationOnDescribeClusterTimeout() {
+        //Given
+        final KafkaFutureImpl<Collection<Node>> neverEndingFuture = new KafkaFutureImpl<>();
+        when(describeClusterResult.nodes()).thenReturn(neverEndingFuture);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
+        assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SAFETY_TIMEOUT);
+    }
+
+    @Test
+    void shouldProduceFailedObservationWhenDescribeClusterCompletesExceptionally() {
+        //Given
+        final KafkaFutureImpl<Collection<Node>> kafkaFuture = new KafkaFutureImpl<>();
+        kafkaFuture.completeExceptionally(new RuntimeException("Boom"));
+        when(describeClusterResult.nodes()).thenReturn(kafkaFuture);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
+        assertVolumeUsageStatus(results, VolumeSourceObservationStatus.DESCRIBE_CLUSTER_ERROR);
+    }
+
+    @Test
+    void shouldProduceFailedObservationWhenDescribeLogDirsFutureCompletesExceptionally() {
+        //Given
+        final KafkaFutureImpl<Map<Integer, Map<String, LogDirDescription>>> kafkaFuture = new KafkaFutureImpl<>();
+        kafkaFuture.completeExceptionally(new RuntimeException("Boom"));
+        when(describeLogDirsResult.allDescriptions()).thenReturn(kafkaFuture);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
+        assertVolumeUsageStatus(results, VolumeSourceObservationStatus.DESCRIBE_LOG_DIR_ERROR);
     }
 
     @Test
@@ -69,9 +148,7 @@ class VolumeSourceTest {
 
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
-        assertThat(results).hasSize(1);
-        final VolumeUsageResult onlyResult = results.get(0);
-        assertThat(onlyResult.getStatus()).isEqualTo(VolumeSourceObservationStatus.SUCCESS);
+        final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
         assertThat(onlyResult.getVolumeUsages()).containsExactly(new VolumeUsage("1", "dir1", 50, 10));
     }
 
@@ -88,9 +165,7 @@ class VolumeSourceTest {
 
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
-        assertThat(results).hasSize(1);
-        final VolumeUsageResult onlyResult = results.get(0);
-        assertThat(onlyResult.getStatus()).isEqualTo(VolumeSourceObservationStatus.SUCCESS);
+        final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
         VolumeUsage expected1 = new VolumeUsage("1", "dir1", 50, 10);
         VolumeUsage expected2 = new VolumeUsage("1", "dir2", 30, 5);
         assertThat(onlyResult.getVolumeUsages()).containsExactlyInAnyOrder(expected1, expected2);
@@ -112,9 +187,7 @@ class VolumeSourceTest {
 
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
-        assertThat(results).hasSize(1);
-        final VolumeUsageResult onlyResult = results.get(0);
-        assertThat(onlyResult.getStatus()).isEqualTo(VolumeSourceObservationStatus.SUCCESS);
+        final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
         VolumeUsage expected1 = new VolumeUsage("1", "dir1", 50, 10);
         VolumeUsage expected2 = new VolumeUsage("2", "dir1", 30, 5);
         assertThat(onlyResult.getVolumeUsages()).containsExactlyInAnyOrder(expected1, expected2);
@@ -136,9 +209,7 @@ class VolumeSourceTest {
 
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
-        assertThat(results).hasSize(1);
-        final VolumeUsageResult onlyResult = results.get(0);
-        assertThat(onlyResult.getStatus()).isEqualTo(VolumeSourceObservationStatus.SUCCESS);
+        final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
         VolumeUsage expected2 = new VolumeUsage("2", "dir1", 30, 5);
         assertThat(onlyResult.getVolumeUsages()).containsExactlyInAnyOrder(expected2);
     }
@@ -153,9 +224,7 @@ class VolumeSourceTest {
 
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
-        assertThat(results).hasSize(1);
-        final VolumeUsageResult onlyInvocation = results.get(0);
-        assertThat(onlyInvocation.getStatus()).isEqualTo(VolumeSourceObservationStatus.SUCCESS);
+        final VolumeUsageResult onlyInvocation = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
         assertThat(onlyInvocation.getVolumeUsages()).isEmpty();
     }
 
@@ -181,6 +250,13 @@ class VolumeSourceTest {
     private void givenLogDirDescription(int nodeId, String logDir, long totalBytes, long usableBytes) {
         final LogDirDescription dirDescription = new LogDirDescription(null, Map.of(), totalBytes, usableBytes);
         descriptions.computeIfAbsent(nodeId, HashMap::new).put(logDir, dirDescription);
+    }
+
+    private static VolumeUsageResult assertVolumeUsageStatus(List<VolumeUsageResult> results, VolumeSourceObservationStatus expectedStatus) {
+        assertThat(results).hasSize(1);
+        final VolumeUsageResult onlyResult = results.get(0);
+        assertThat(onlyResult.getStatus()).isEqualTo(expectedStatus);
+        return onlyResult;
     }
 
 }
