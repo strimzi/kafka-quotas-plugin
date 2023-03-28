@@ -86,7 +86,7 @@ public class VolumeSource implements Runnable {
             log.warn("Caught interrupt exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
             Thread.currentThread().interrupt();
         } catch (ExecutionException e) {
-            volumeObserver.observeVolumeUsage(failure(VolumeSourceObservationStatus.EXECUTION_EXCEPTION, e));
+            notifyObserver(failure(VolumeSourceObservationStatus.EXECUTION_EXCEPTION, e));
             log.warn("Caught execution exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
         } catch (TimeoutException e) {
             notifyObserver(failure(VolumeSourceObservationStatus.SAFETY_TIMEOUT, e));
