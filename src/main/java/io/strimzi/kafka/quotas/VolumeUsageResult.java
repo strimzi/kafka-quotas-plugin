@@ -10,7 +10,7 @@ import java.util.List;
 
 
 /**
- * <p>he result of an observation of the volumes in your kafka cluster.</p>
+ * <p>The result of an observation of the volumes in your kafka cluster.</p>
  * The result can either be:
  * <ul>
  * <li><strong>successful</strong>; status is SUCCESS and volumeUsages is derived from a successful observation of the whole cluster</li>

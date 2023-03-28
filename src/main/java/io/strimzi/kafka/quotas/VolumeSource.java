@@ -73,7 +73,7 @@ public class VolumeSource implements Runnable {
                     if (log.isDebugEnabled()) {
                         log.debug("Successfully described cluster: " + nodes);
                     }
-                    //Deliberately stay on the adminClient thread as the next thing we do is another admin API call
+                    //Stay on the thread completing the future (probably the adminClient's thread) as the next thing we do is another admin API call
                     onDescribeClusterSuccess(nodes, volumeUsageResultPromise);
                 }
             });
