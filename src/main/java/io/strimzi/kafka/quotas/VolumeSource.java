@@ -47,6 +47,7 @@ public class VolumeSource implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(VolumeSource.class);
 
     /**
+     * Creates a volume source.
      * @param admin          The Kafka Admin client to be used for gathering information.
      * @param volumeObserver the listener to be notified of the volume usage
      * @param timeout        how long should we wait for cluster information
@@ -161,6 +162,7 @@ public class VolumeSource implements Runnable {
         private final Throwable throwable;
 
         /**
+         * Creates a result to contain the result or exception.
          * @param result the optional result instance.
          * @param throwable the optional throwable
          */
@@ -169,15 +171,27 @@ public class VolumeSource implements Runnable {
             this.throwable = throwable;
         }
 
+        /**
+         * The value of the result or {@code null} in case of error
+         * @return the value
+         */
         public T getValue() {
             return value;
         }
 
+        /**
+         * The cause of the  error or {@code null} in case of sucess.
+         * @return the value
+         */
         public Throwable getThrowable() {
             return throwable;
         }
 
 
+        /**
+         * Identifies if the result was success or a failure
+         * @return {@code true} if the result represents an error
+         */
         public boolean isFailure() {
             return throwable != null;
         }

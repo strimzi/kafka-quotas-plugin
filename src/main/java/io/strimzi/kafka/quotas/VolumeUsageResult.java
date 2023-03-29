@@ -20,6 +20,7 @@ import java.util.List;
 public class VolumeUsageResult {
 
     /**
+     * The observed usage on a per-volume basis.
      * @return observed volume usage, this is empty if the status is not SUCCESS
      */
     public Collection<VolumeUsage> getVolumeUsages() {
@@ -27,6 +28,7 @@ public class VolumeUsageResult {
     }
 
     /**
+     * The status of this observation.
      * @return categorises the result of the observation, either SUCCESS or another status that indicated failure
      */
     public VolumeSourceObservationStatus getStatus() {
@@ -85,6 +87,7 @@ public class VolumeUsageResult {
     }
 
     /**
+     * Creates an instance to represent a successful observation
      * @param volumeUsages the observed usages
      * @return a volume usage observation containing volumeUsages and having a SUCCESS status
      */
@@ -93,6 +96,7 @@ public class VolumeUsageResult {
     }
 
     /**
+     * Creates an instance to represent a failed observation.
      * @param status the failure status
      * @param cause the exception that caused the failure (nullable)
      * @return a volume usage observation containing volumeUsages and having a non SUCCESS status

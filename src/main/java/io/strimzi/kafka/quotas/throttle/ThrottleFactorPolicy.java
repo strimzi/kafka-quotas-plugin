@@ -5,9 +5,9 @@
 
 package io.strimzi.kafka.quotas.throttle;
 
-import io.strimzi.kafka.quotas.VolumeUsage;
-
 import java.util.Collection;
+
+import io.strimzi.kafka.quotas.VolumeUsage;
 
 /**
  * Determines the current restriction factor to be applied to the client quota.
@@ -17,6 +17,7 @@ import java.util.Collection;
  */
 public interface ThrottleFactorPolicy {
     /**
+     * Calculates the factor to apply in the range {@code [0..1]}
      * @param observedVolumes updated Volume usage data
      * @return The current factor in the range {@code [0..1]} to scale the throttle by.
      */

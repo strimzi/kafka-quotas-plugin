@@ -31,6 +31,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
     private final double fallbackThrottleFactor;
 
     /**
+     * Creates a policy based throttle.
      * @param factorPolicy Which policy to apply
      * @param listener     the lister to be notified of changes
      * @param expiryPolicy expiry policy to control how long a factor is applied for

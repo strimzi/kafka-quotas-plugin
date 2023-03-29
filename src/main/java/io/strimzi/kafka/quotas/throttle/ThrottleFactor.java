@@ -47,7 +47,7 @@ public class ThrottleFactor {
     }
 
     /**
-     *
+     * Provides the multiplication factor to apply to quotas.
      * @return the throttle factor
      */
     public double getThrottleFactor() {
@@ -55,6 +55,7 @@ public class ThrottleFactor {
     }
 
     /**
+     * Is the current factor still valid or is it considered too old
      * @return true if expired
      */
     public boolean isExpired() {
@@ -75,7 +76,7 @@ public class ThrottleFactor {
     }
 
     /**
-     *
+     * Creates a new valid factor instance
      * @param throttleFactor the factor to apply
      * @param validFrom validFrom
      * @param policy expiry policy
@@ -86,6 +87,7 @@ public class ThrottleFactor {
     }
 
     /**
+     * Creates a factor instance which never expires.
      * @param throttleFactor the factor to apply
      * @return a throttle factor from fallback
      */
