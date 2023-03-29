@@ -77,13 +77,13 @@ public class VolumeUsageResult {
 
     private final Collection<VolumeUsage> volumeUsages;
     private final VolumeSourceObservationStatus status;
-    private final Throwable throwable;
+    private final Class<? extends Throwable> causeOfFailure;
 
 
-    private VolumeUsageResult(Collection<VolumeUsage> volumeUsages, VolumeSourceObservationStatus status, Throwable throwable) {
+    private VolumeUsageResult(Collection<VolumeUsage> volumeUsages, VolumeSourceObservationStatus status, Class<? extends Throwable> causeOfFailure) {
         this.volumeUsages = volumeUsages;
         this.status = status;
-        this.throwable = throwable;
+        this.causeOfFailure = causeOfFailure;
     }
 
     /**
@@ -101,7 +101,7 @@ public class VolumeUsageResult {
      * @param cause the exception that caused the failure (nullable)
      * @return a volume usage observation containing volumeUsages and having a non SUCCESS status
      */
-    public static VolumeUsageResult failure(VolumeSourceObservationStatus status, Throwable cause) {
+    public static VolumeUsageResult failure(VolumeSourceObservationStatus status, Class<? extends Throwable> cause) {
         if (status == VolumeSourceObservationStatus.SUCCESS) {
             throw new IllegalArgumentException("success is not a failure");
         }
@@ -113,7 +113,7 @@ public class VolumeUsageResult {
         return "VolumeUsageObservation{" +
                 "volumeUsages=" + volumeUsages +
                 ", status=" + status +
-                ", throwable=" + throwable +
+                ", throwable=" + causeOfFailure +
                 '}';
     }
 }

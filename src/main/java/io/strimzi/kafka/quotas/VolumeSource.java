@@ -75,17 +75,17 @@ public class VolumeSource implements Runnable {
             notifyObserver(volumeUsagePromise.get(timeout, timeoutUnit));
             log.info("Updated cluster volume usage.");
         } catch (InterruptedException e) {
-            notifyObserver(failure(VolumeSourceObservationStatus.INTERRUPTED, e));
+            notifyObserver(failure(VolumeSourceObservationStatus.INTERRUPTED, e.getClass()));
             log.warn("Caught interrupt exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
             Thread.currentThread().interrupt();
         } catch (ExecutionException e) {
-            notifyObserver(failure(VolumeSourceObservationStatus.EXECUTION_EXCEPTION, e));
+            notifyObserver(failure(VolumeSourceObservationStatus.EXECUTION_EXCEPTION, e.getClass()));
             log.warn("Caught execution exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
         } catch (TimeoutException e) {
-            notifyObserver(failure(VolumeSourceObservationStatus.SAFETY_TIMEOUT, e));
+            notifyObserver(failure(VolumeSourceObservationStatus.SAFETY_TIMEOUT, e.getClass()));
             log.warn("Caught timeout exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
         } catch (RuntimeException e) {
-            notifyObserver(failure(VolumeSourceObservationStatus.EXCEPTION, e));
+            notifyObserver(failure(VolumeSourceObservationStatus.EXCEPTION, e.getClass()));
             log.warn("Caught runtime exception trying to describe cluster and logDirs: {}", e.getMessage(), e);
         }
 
@@ -95,7 +95,7 @@ public class VolumeSource implements Runnable {
         return future
                 .toCompletionStage()
                 .thenApply(descriptions -> new Result<>(descriptions, null))
-                .exceptionally(e -> new Result<>(null, e));
+                .exceptionally(e -> new Result<>(null, e.getClass()));
     }
 
     private void notifyObserver(VolumeUsageResult result) {
@@ -146,7 +146,7 @@ public class VolumeSource implements Runnable {
             if (logDirDescription.totalBytes().isPresent() && logDirDescription.usableBytes().isPresent()) {
                 final long totalBytes = logDirDescription.totalBytes().getAsLong();
                 final long usableBytes = logDirDescription.usableBytes().getAsLong();
-                return new VolumeUsage("" + brokerIdToLogDirs.getKey(), logDirs.getKey(), totalBytes, usableBytes);
+                return new VolumeUsage(String.valueOf(brokerIdToLogDirs.getKey()), logDirs.getKey(), totalBytes, usableBytes);
             } else {
                 return null;
             }
@@ -159,14 +159,14 @@ public class VolumeSource implements Runnable {
      */
     public static class Result<T> {
         private final T value;
-        private final Throwable throwable;
+        private final Class<? extends Throwable> throwable;
 
         /**
          * Creates a result to contain the result or exception.
          * @param result the optional result instance.
          * @param throwable the optional throwable
          */
-        public Result(T result, Throwable throwable) {
+        public Result(T result, Class<? extends Throwable> throwable) {
             this.value = result;
             this.throwable = throwable;
         }
@@ -183,7 +183,7 @@ public class VolumeSource implements Runnable {
          * The cause of the  error or {@code null} in case of sucess.
          * @return the value
          */
-        public Throwable getThrowable() {
+        public Class<? extends Throwable> getThrowable() {
             return throwable;
         }
 
