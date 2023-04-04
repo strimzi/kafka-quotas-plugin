@@ -6,6 +6,7 @@
 package io.strimzi.kafka.quotas;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -17,6 +18,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Gauge;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus;
 import org.apache.kafka.clients.admin.Admin;
@@ -26,6 +29,7 @@ import org.apache.kafka.common.Node;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static io.strimzi.kafka.quotas.StaticQuotaCallback.metricName;
 import static io.strimzi.kafka.quotas.VolumeUsageResult.failure;
 import static io.strimzi.kafka.quotas.VolumeUsageResult.success;
 import static java.util.stream.Collectors.toSet;
@@ -135,11 +139,27 @@ public class VolumeSource implements Runnable {
         if (log.isDebugEnabled()) {
             log.debug("Successfully described logDirs: " + logDirsPerBroker);
         }
-        return success(logDirsPerBroker.entrySet()
+        List<VolumeUsage> volumeUsages = logDirsPerBroker.entrySet()
                 .stream()
                 .flatMap(VolumeSource::toVolumes)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toUnmodifiableList()));
+                .collect(Collectors.toUnmodifiableList());
+
+        volumeUsages.forEach(volumeUsage -> {
+            Metrics.newGauge(metricName(VolumeSource.class, volumeUsage.getBrokerId() + "_" + volumeUsage.getLogDir() + "_consumed_bytes"), new Gauge<>() {
+                @Override
+                public Object value() {
+                    return volumeUsage.getConsumedSpace();
+                }
+            });
+            Metrics.newGauge(metricName(VolumeSource.class, volumeUsage.getBrokerId() + "_" + volumeUsage.getLogDir() + "_available_bytes"), new Gauge<>() {
+                @Override
+                public Object value() {
+                    return volumeUsage.getAvailableBytes();
+                }
+            });
+        });
+        return success(volumeUsages);
     }
 
     private static Stream<? extends VolumeUsage> toVolumes(Map.Entry<Integer, Map<String, LogDirDescription>> brokerIdToLogDirs) {

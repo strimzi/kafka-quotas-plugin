@@ -10,9 +10,12 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import com.yammer.metrics.core.Metric;
+import com.yammer.metrics.core.MetricName;
 import io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.DescribeClusterResult;
@@ -150,6 +153,77 @@ class VolumeSourceTest {
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
         final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
         assertThat(onlyResult.getVolumeUsages()).containsExactly(new VolumeUsage("1", "dir1", 50, 10));
+    }
+
+    @Test
+    void shouldCreateConsumedBytesMetricForALogDir() {
+        //Given
+        final int nodeId = 1;
+        givenNode(nodeId);
+        givenLogDirDescription(nodeId, "dir1", 50, 10);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = MetricUtils.getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir1_consumed_bytes", 40L);
+    }
+    @Test
+    void shouldCreateAvailableBytesMetricForALogDir() {
+        //Given
+        final int nodeId = 1;
+        givenNode(nodeId);
+        givenLogDirDescription(nodeId, "dir1", 50, 10);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = MetricUtils.getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir1_available_bytes", 10L);
+    }
+
+    @Test
+    void shouldCreateConsumedBytesMetricForEachLogDir() {
+        //Given
+        final int nodeId = 1;
+        final int node2Id = nodeId + 1;
+        givenNode(nodeId);
+        givenNode(node2Id);
+        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        givenLogDirDescription(nodeId, "dir2", 60, 15);
+        givenLogDirDescription(node2Id, "dir3", 40, 1);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = MetricUtils.getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir1_consumed_bytes", 40L);
+        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir2_consumed_bytes", 45L);
+        MetricUtils.assertGaugeMetric(volumeSourceMetrics, node2Id + "_dir3_consumed_bytes", 39L);
+    }
+
+    @Test
+    void shouldCreateAvailableBytesMetricForEachLogDir() {
+        //Given
+        final int nodeId = 1;
+        final int node2Id = nodeId + 1;
+        givenNode(nodeId);
+        givenNode(node2Id);
+        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        givenLogDirDescription(nodeId, "dir2", 60, 15);
+        givenLogDirDescription(node2Id, "dir3", 40, 1);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = MetricUtils.getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir1_available_bytes", 10L);
+        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir2_available_bytes", 15L);
+        MetricUtils.assertGaugeMetric(volumeSourceMetrics, node2Id + "_dir3_available_bytes", 1L);
     }
 
     @Test
