@@ -48,6 +48,7 @@ public class VolumeSource implements Runnable {
 
     /**
      * Creates a volume source.
+     *
      * @param admin          The Kafka Admin client to be used for gathering information.
      * @param volumeObserver the listener to be notified of the volume usage
      * @param timeout        how long should we wait for cluster information
@@ -95,7 +96,10 @@ public class VolumeSource implements Runnable {
         return future
                 .toCompletionStage()
                 .thenApply(descriptions -> new Result<>(descriptions, null))
-                .exceptionally(e -> new Result<>(null, e.getClass()));
+                .exceptionally(e -> {
+                    log.debug("Creating failed result for call.", e);
+                    return new Result<>(null, e.getClass());
+                });
     }
 
     private void notifyObserver(VolumeUsageResult result) {
@@ -115,6 +119,7 @@ public class VolumeSource implements Runnable {
 
     private CompletionStage<VolumeUsageResult> onDescribeClusterSuccess(Collection<Node> nodes) {
         final Set<Integer> allBrokerIds = nodes.stream().map(Node::id).collect(toSet());
+        log.debug("Attempting to describe logDirs");
         return toResultStage(admin.describeLogDirs(allBrokerIds).allDescriptions())
                 .thenApply(VolumeSource::onDescribeLogDirComplete);
     }
@@ -155,6 +160,7 @@ public class VolumeSource implements Runnable {
 
     /**
      * Contains a result or exception
+     *
      * @param <T> the type of the result
      */
     public static class Result<T> {
@@ -163,7 +169,8 @@ public class VolumeSource implements Runnable {
 
         /**
          * Creates a result to contain the result or exception.
-         * @param result the optional result instance.
+         *
+         * @param result    the optional result instance.
          * @param throwable the optional throwable
          */
         public Result(T result, Class<? extends Throwable> throwable) {
@@ -173,6 +180,7 @@ public class VolumeSource implements Runnable {
 
         /**
          * The value of the result or {@code null} in case of error
+         *
          * @return the value
          */
         public T getValue() {
@@ -180,7 +188,8 @@ public class VolumeSource implements Runnable {
         }
 
         /**
-         * The cause of the  error or {@code null} in case of sucess.
+         * The cause of the  error or {@code null} in case of success.
+         *
          * @return the value
          */
         public Class<? extends Throwable> getThrowable() {
@@ -190,6 +199,7 @@ public class VolumeSource implements Runnable {
 
         /**
          * Identifies if the result was success or a failure
+         *
          * @return {@code true} if the result represents an error
          */
         public boolean isFailure() {
