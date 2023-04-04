@@ -57,7 +57,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     /**
      * Default constructor for production use.
      * <p>
-     * It provides a default {@link io.strimzi.kafka.quotas.VolumeSourceBuilder#VolumeSourceBuilder()} and a single threaded executor for running background tasks on a named thread.
+     * It provides a default {@link io.strimzi.kafka.quotas.VolumeSourceBuilder#VolumeSourceBuilder()} and a scheduled executor for running background tasks on named threads.
      */
     public StaticQuotaCallback() {
         this(new VolumeSourceBuilder(), Executors.newScheduledThreadPool(2, r -> {
