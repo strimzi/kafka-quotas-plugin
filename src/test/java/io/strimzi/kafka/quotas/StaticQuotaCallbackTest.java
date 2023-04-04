@@ -147,14 +147,12 @@ class StaticQuotaCallbackTest {
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
 
         //Then
-        assertThrows(IllegalStateException.class, () -> {
-            quotaCallback.configure(Map.of(
-                    StaticQuotaConfig.AVAILABLE_RATIO_PROP, 0.5,
-                    StaticQuotaConfig.AVAILABLE_BYTES_PROP, 1,
-                    StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10,
-                    StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
-            ));
-        });
+        assertThrows(IllegalStateException.class, () -> quotaCallback.configure(Map.of(
+                StaticQuotaConfig.AVAILABLE_RATIO_PROP, 0.5,
+                StaticQuotaConfig.AVAILABLE_BYTES_PROP, 1,
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10,
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
+        )));
     }
 
     @Test
