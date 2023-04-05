@@ -66,7 +66,6 @@ public class VolumeSource implements Runnable {
     public void run() {
         try {
             log.info("Updating cluster volume usage.");
-            log.debug("Attempting to describe cluster");
             CompletableFuture<VolumeUsageResult> volumeUsagePromise = toResultStage(admin.describeCluster().nodes())
                     //Stay on the thread completing the future (probably the adminClient's thread) as the next thing we do is another admin API call
                     .thenCompose(this::onDescribeClusterComplete)
