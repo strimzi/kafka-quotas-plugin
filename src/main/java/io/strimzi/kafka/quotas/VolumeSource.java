@@ -174,6 +174,9 @@ public class VolumeSource implements Runnable {
          * @param throwable the optional throwable
          */
         public Result(T result, Class<? extends Throwable> throwable) {
+            if (Objects.nonNull(result) && Objects.nonNull(throwable)) {
+                throw new IllegalArgumentException("An operation can have a result or an error but not both.");
+            }
             this.value = result;
             this.throwable = throwable;
         }
