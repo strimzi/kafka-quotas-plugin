@@ -71,7 +71,7 @@ public class VolumeUsage {
     }
 
     /**
-     * Expresses the available space as a percentage.
+     * Expresses the available space as a ratio in the range [0,1].
      * @return The ratio of available bytes to capacity bytes (0.0 if capacity is 0 bytes).
      */
     public double getAvailableRatio() {
