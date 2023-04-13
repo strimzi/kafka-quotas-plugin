@@ -93,15 +93,11 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
 
     private ThrottleFactor getNewFactor(VolumeUsageResult observedVolumes, ThrottleFactor current) {
         if (observedVolumes.getStatus() == SUCCESS) {
-            return calculateThrottleFactorWithExpiry(observedVolumes);
+            double newFactor = factorPolicy.calculateFactor(observedVolumes.getVolumeUsages());
+            return ThrottleFactor.validFactor(newFactor, clock.instant(), expiryPolicy);
         } else {
             return maybeFallback(current);
         }
-    }
-
-    private ThrottleFactor calculateThrottleFactorWithExpiry(VolumeUsageResult observedVolumes) {
-        double newFactor = factorPolicy.calculateFactor(observedVolumes.getVolumeUsages());
-        return ThrottleFactor.validFactor(newFactor, clock.instant(), expiryPolicy);
     }
 
     private ThrottleFactor maybeFallback(ThrottleFactor currentFactor) {
