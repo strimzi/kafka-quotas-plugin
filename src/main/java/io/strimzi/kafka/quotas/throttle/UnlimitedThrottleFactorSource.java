@@ -5,8 +5,6 @@
 
 package io.strimzi.kafka.quotas.throttle;
 
-import io.strimzi.kafka.quotas.throttle.fallback.ExpiryPolicy;
-
 import java.time.Instant;
 
 /**

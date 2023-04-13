@@ -6,8 +6,6 @@ package io.strimzi.kafka.quotas.throttle;
 
 import java.time.Instant;
 
-import io.strimzi.kafka.quotas.throttle.fallback.ExpiryPolicy;
-
 /**
  * Represents a throttle factor, when it was created, its expiry policy and indicates the source:
  * 1. from a valid observation of the cluster volumes

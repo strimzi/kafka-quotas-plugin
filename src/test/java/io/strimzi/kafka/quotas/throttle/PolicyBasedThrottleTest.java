@@ -4,17 +4,16 @@
  */
 package io.strimzi.kafka.quotas.throttle;
 
-import io.strimzi.kafka.quotas.TickableClock;
-import io.strimzi.kafka.quotas.VolumeUsage;
-import io.strimzi.kafka.quotas.VolumeUsageResult;
-import io.strimzi.kafka.quotas.throttle.fallback.ExpiryPolicy;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+
+import io.strimzi.kafka.quotas.TickableClock;
+import io.strimzi.kafka.quotas.VolumeUsage;
+import io.strimzi.kafka.quotas.VolumeUsageResult;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import static io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus.INTERRUPTED;
 import static org.assertj.core.api.Assertions.assertThat;

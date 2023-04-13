@@ -2,15 +2,15 @@
  * Copyright Strimzi authors.
  * License: Apache License 2.0 (see the file LICENSE or http://apache.org/licenses/LICENSE-2.0.html).
  */
-package io.strimzi.kafka.quotas.throttle.fallback;
-
-import io.strimzi.kafka.quotas.TickableClock;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+package io.strimzi.kafka.quotas.throttle;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+
+import io.strimzi.kafka.quotas.TickableClock;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

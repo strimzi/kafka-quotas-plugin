@@ -9,7 +9,6 @@ import java.util.function.Function;
 
 import io.strimzi.kafka.quotas.VolumeObserver;
 import io.strimzi.kafka.quotas.VolumeUsageResult;
-import io.strimzi.kafka.quotas.throttle.fallback.ExpiryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
