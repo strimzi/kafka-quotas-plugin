@@ -5,7 +5,6 @@
 package io.strimzi.kafka.quotas.throttle;
 
 import java.time.Clock;
-import java.util.Objects;
 import java.util.function.Function;
 
 import io.strimzi.kafka.quotas.VolumeObserver;
@@ -82,7 +81,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
     private synchronized boolean updateFactorAndCheckIfChanged(Function<ThrottleFactor, ThrottleFactor> throttleFactorUpdater) {
         ThrottleFactor currentFactor = this.throttleFactor;
         throttleFactor = throttleFactorUpdater.apply(currentFactor);
-        boolean changed = !Objects.equals(currentFactor.getThrottleFactor(), throttleFactor.getThrottleFactor());
+        boolean changed = currentFactor.getThrottleFactor() != throttleFactor.getThrottleFactor();
         if (changed) {
             log.info("Throttle Factor changed from {} to {}, notifying listener", currentFactor, throttleFactor);
         } else {
