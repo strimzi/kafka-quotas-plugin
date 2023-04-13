@@ -14,22 +14,22 @@ import java.time.Instant;
 public class FixedDurationExpiryPolicy implements ExpiryPolicy {
 
 
-    private final Duration expireAfter;
+    private final Duration validFor;
     private final Clock clock;
 
     /**
      * Create a {@link FixedDurationExpiryPolicy} with a fixed duration
      * @param clock Clock used to determine the current instant
-     * @param expireAfter Duration which input is expired after
+     * @param validFor The duration during which the input is considered valid
      */
-    public FixedDurationExpiryPolicy(Clock clock, Duration expireAfter) {
+    public FixedDurationExpiryPolicy(Clock clock, Duration validFor) {
         this.clock = clock;
-        this.expireAfter = expireAfter;
+        this.validFor = validFor;
     }
 
     @Override
     public boolean isExpired(Instant validFrom) {
-        return clock.instant().isAfter(validFrom.plus(expireAfter));
+        return clock.instant().isAfter(validFrom.plus(validFor));
     }
 
 }
