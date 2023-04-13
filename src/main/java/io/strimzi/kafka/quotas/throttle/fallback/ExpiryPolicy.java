@@ -14,7 +14,7 @@ public interface ExpiryPolicy {
     /**
      * An expiry policy that will never expire input
      */
-    ExpiryPolicy NEVER_EXPIRES = expiresAt -> false;
+    ExpiryPolicy NEVER_EXPIRES = validFrom -> false;
 
     /**
      * Given a validFrom instant return true if it is no longer
