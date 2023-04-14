@@ -17,7 +17,7 @@ public class VolumeUsage {
     private final long availableBytes;
 
     /**
-     *
+     * Represents a snapshot of volume usage.
      * @param brokerId which broker does this volume belong too
      * @param logDir the specific logDir the volume hosts
      * @param capacity How many bytes the volume holds
@@ -31,7 +31,7 @@ public class VolumeUsage {
     }
 
     /**
-     *
+     * The source BrokerId.
      * @return The brokerId for the broker holding the volume
      */
     public String getBrokerId() {
@@ -39,7 +39,7 @@ public class VolumeUsage {
     }
 
     /**
-     *
+     * The log directory, logDir in Kafka parlance.
      * @return the path identifying the logDir on the broker its hosted by.
      */
     public String getLogDir() {
@@ -47,6 +47,7 @@ public class VolumeUsage {
     }
 
     /**
+     * The capacity of the underlying Volume.
      * @return The size of the volume in bytes.
      */
     public long getCapacity() {
@@ -54,7 +55,7 @@ public class VolumeUsage {
     }
 
     /**
-     *
+     * The available capacity of the underlying volume.
      * @return The number available (free) remaining on the volume.
      */
     public long getAvailableBytes() {
@@ -62,7 +63,7 @@ public class VolumeUsage {
     }
 
     /**
-     *
+     * The consumed capacity of the underlying volume.
      * @return The number of bytes on the volume which have been consumed (used).
      */
     public long getConsumedSpace() {
@@ -70,7 +71,7 @@ public class VolumeUsage {
     }
 
     /**
-     *
+     * Expresses the available space as a ratio in the range [0,1].
      * @return The ratio of available bytes to capacity bytes (0.0 if capacity is 0 bytes).
      */
     public double getAvailableRatio() {

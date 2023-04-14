@@ -5,13 +5,14 @@
 
 package io.strimzi.kafka.quotas;
 
-import java.util.List;
-
+import io.strimzi.kafka.quotas.throttle.AvailableBytesThrottleFactorPolicy;
 import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

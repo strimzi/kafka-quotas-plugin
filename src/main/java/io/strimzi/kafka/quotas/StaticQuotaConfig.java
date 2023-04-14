@@ -4,6 +4,8 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.time.Duration;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,8 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String STORAGE_CHECK_INTERVAL_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.check-interval";
     static final String AVAILABLE_BYTES_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.bytes";
     static final String AVAILABLE_RATIO_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".storage.per.volume.limit.min.available.ratio";
+    static final String FALLBACK_THROTTLE_FACTOR_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".throttle.factor.fallback";
+    static final String THROTTLE_FALLBACK_VALIDITY_DURATION_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".throttle.factor.validity.duration";
     static final String ADMIN_BOOTSTRAP_SERVER_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.bootstrap.servers";
     private final KafkaClientConfig kafkaClientConfig;
     private final boolean supportsKip827;
@@ -73,7 +77,9 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(EXCLUDED_PRINCIPAL_NAME_LIST_PROP, LIST, List.of(), MEDIUM, "List of principals that are excluded from the quota")
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
                         .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrInRangeValidator(atLeast(0)), MEDIUM, "Stop message production if availableBytes <= this value")
-                        .define(AVAILABLE_RATIO_PROP, DOUBLE, null, nullOrInRangeValidator(between(0.0, 1.0)), MEDIUM, "Stop message production if availableBytes / capacityBytes <= this value"),
+                        .define(AVAILABLE_RATIO_PROP, DOUBLE, null, nullOrInRangeValidator(between(0.0, 1.0)), MEDIUM, "Stop message production if availableBytes / capacityBytes <= this value")
+                        .define(THROTTLE_FALLBACK_VALIDITY_DURATION_PROP, STRING, "PT5M", iso8601DurationValidator(), MEDIUM, "How long a throttle factor derived from a successful observation of the cluster should be applied (iso8601 duration)")
+                        .define(FALLBACK_THROTTLE_FACTOR_PROP, DOUBLE, 1.0, nullOrInRangeValidator(between(0.0, 1.0)), MEDIUM, "Fallback throttle factor to apply if current factor expires"),
                 props,
                 doLog);
         this.supportsKip827 = supportsKip827;
@@ -126,6 +132,14 @@ public class StaticQuotaConfig extends AbstractConfig {
         return supportsKip827;
     }
 
+    double getFallbackThrottleFactor() {
+        return getDouble(FALLBACK_THROTTLE_FACTOR_PROP);
+    }
+
+    Duration getThrottleFactorValidityDuration() {
+        return Duration.parse(getString(THROTTLE_FALLBACK_VALIDITY_DURATION_PROP));
+    }
+
     private static ConfigDef.LambdaValidator nullOrInRangeValidator(ConfigDef.Range range) {
         return ConfigDef.LambdaValidator.with((name, value) -> {
             if (value != null) {
@@ -133,6 +147,18 @@ public class StaticQuotaConfig extends AbstractConfig {
             }
         }, range::toString);
     }
+
+    private static ConfigDef.LambdaValidator iso8601DurationValidator() {
+        return ConfigDef.LambdaValidator.with((name, value) -> {
+            String duration = (String) value;
+            try {
+                Duration.parse(duration);
+            } catch (DateTimeParseException ex) {
+                throw new ConfigException(name, value, "Failed to parse iso8601 duration");
+            }
+        }, () -> "Should be a valid iso8601 duration string like PT5M");
+    }
+
 
     static class KafkaClientConfig extends AbstractConfig {
         public static final String CLIENT_ID_PREFIX_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.clientIdPrefix";
@@ -160,7 +186,7 @@ public class StaticQuotaConfig extends AbstractConfig {
         public Map<String, Object> getKafkaClientConfig() {
             Map<String, Object> configuredProperties = originalsWithPrefix(ADMIN_CONFIG_PREFIX, true);
             configuredProperties.computeIfAbsent(AdminClientConfig.CLIENT_ID_CONFIG, this::generateClientId);
-            log.info("resolved kafka config of {}", configuredProperties);
+            log.info("Resolved kafka config of {}", configuredProperties);
             return configuredProperties;
         }
 

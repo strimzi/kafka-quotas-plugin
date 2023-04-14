@@ -5,6 +5,7 @@
 
 package io.strimzi.kafka.quotas;
 
+import io.strimzi.kafka.quotas.throttle.AvailableRatioThrottleFactorPolicy;
 import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -5,8 +5,6 @@
 
 package io.strimzi.kafka.quotas;
 
-import java.util.Collection;
-
 /**
  * Defines the interface for being notified of the clusters volume usage.
  */
@@ -14,7 +12,8 @@ import java.util.Collection;
 public interface VolumeObserver {
 
     /**
-     * @param observedVolumes a collection of VolumeUsage observations
+     * Invoked to inform listeners of the outcome of an observation attempt.
+     * @param result the result of a VolumeUsage observations
      */
-    void observeVolumeUsage(Collection<VolumeUsage> observedVolumes);
+    void observeVolumeUsage(VolumeUsageResult result);
 }

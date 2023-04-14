@@ -12,7 +12,7 @@ import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClient;
 
 /**
- * A builder which ensures the <a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-827%3A+Expose+log+dirs+total+and+usable+space+via+Kafka+API">KIP-827 API</a> is available and will throw exceptions if not.
+ * A fluent builder which ensures the <a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-827%3A+Expose+log+dirs+total+and+usable+space+via+Kafka+API">KIP-827 API</a> is available and will throw exceptions if not.
  *
  * @see <a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-827%3A+Expose+log+dirs+total+and+usable+space+via+Kafka+API">KIP-827 API</a>
  */
@@ -41,7 +41,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
     }
 
     /**
-     *
+     * Provide the builder with the plug-in config.
      * @param config The plug-in configuration to use.
      * @return this to allow fluent usage of the builder.
      */
@@ -51,6 +51,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
     }
 
     /**
+     * Provide the builder with the VolumeObserver.
      * @param volumesObserver The volume consumer to register for updates.
      * @return this to allow fluent usage of the builder.
      */

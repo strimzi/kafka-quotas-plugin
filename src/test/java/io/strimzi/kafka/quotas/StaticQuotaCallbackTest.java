@@ -27,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static io.strimzi.kafka.quotas.VolumeUsageResult.success;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.offset;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,8 +45,10 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class StaticQuotaCallbackTest {
 
-    public static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10, StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", StaticQuotaConfig.AVAILABLE_BYTES_PROP, "2");
+    private static final int STORAGE_CHECK_INTERVAL = 20;
+    private static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, STORAGE_CHECK_INTERVAL, StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", StaticQuotaConfig.AVAILABLE_BYTES_PROP, "2");
     private static final long VOLUME_CAPACITY = 50;
+    public static final long THROTTLE_FACTOR_EXPIRY_INTERVAL = 10L;
 
     @Mock(lenient = true)
     VolumeSourceBuilder volumeSourceBuilder;
@@ -108,7 +111,7 @@ class StaticQuotaCallbackTest {
         ));
 
         //When
-        argument.getValue().observeVolumeUsage(List.of(newVolume(10L)));
+        argument.getValue().observeVolumeUsage(success(List.of(newVolume(10L))));
 
         //Then
         double quotaLimit = quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of());
@@ -130,7 +133,7 @@ class StaticQuotaCallbackTest {
         ));
 
         //When
-        argument.getValue().observeVolumeUsage(List.of(new VolumeUsage("-1", "test", 30L, 15L)));
+        argument.getValue().observeVolumeUsage(success(List.of(new VolumeUsage("-1", "test", 30L, 15L))));
 
         //Then
         double quotaLimit = quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of());
@@ -180,7 +183,8 @@ class StaticQuotaCallbackTest {
         target.configure(MINIMUM_EXECUTABLE_CONFIG);
 
         //Verify
-        verify(scheduledExecutorService, times(1)).scheduleWithFixedDelay(any(), eq(0L), eq(10L), eq(TimeUnit.SECONDS));
+        verify(scheduledExecutorService).scheduleWithFixedDelay(any(), eq(0L), eq((long) STORAGE_CHECK_INTERVAL), eq(TimeUnit.SECONDS));
+        verify(scheduledExecutorService).scheduleWithFixedDelay(any(), eq(0L), eq(THROTTLE_FACTOR_EXPIRY_INTERVAL), eq(TimeUnit.SECONDS));
     }
 
     @Test
@@ -239,7 +243,7 @@ class StaticQuotaCallbackTest {
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.FETCH), "unexpected state on subsequent call without storage state change");
 
         //When
-        volumeObserver.observeVolumeUsage(List.of(newVolume(2)));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(2))));
 
         //Then
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
@@ -259,11 +263,11 @@ class StaticQuotaCallbackTest {
 
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        volumeObserver.observeVolumeUsage(List.of(newVolume(1)));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(1))));
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
-        volumeObserver.observeVolumeUsage(List.of(newVolume(1)));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(1))));
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        volumeObserver.observeVolumeUsage(List.of(newVolume(3)));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(3))));
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 2nd storage state change");
 
         quotaCallback.close();

@@ -4,6 +4,7 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.time.Clock;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -18,6 +19,14 @@ import java.util.concurrent.TimeUnit;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricName;
+import io.strimzi.kafka.quotas.throttle.AvailableBytesThrottleFactorPolicy;
+import io.strimzi.kafka.quotas.throttle.AvailableRatioThrottleFactorPolicy;
+import io.strimzi.kafka.quotas.throttle.FixedDurationExpiryPolicy;
+import io.strimzi.kafka.quotas.throttle.PolicyBasedThrottle;
+import io.strimzi.kafka.quotas.throttle.ThrottleFactor;
+import io.strimzi.kafka.quotas.throttle.ThrottleFactorPolicy;
+import io.strimzi.kafka.quotas.throttle.ThrottleFactorSource;
+import io.strimzi.kafka.quotas.throttle.UnlimitedThrottleFactorSource;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
@@ -37,8 +46,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private static final String EXCLUDED_PRINCIPAL_QUOTA_KEY = "excluded-principal-quota-key";
 
     private volatile Map<ClientQuotaType, Quota> quotaMap = new HashMap<>();
-    private volatile long storageQuotaSoft = Long.MAX_VALUE;
-    private volatile long storageQuotaHard = Long.MAX_VALUE;
     private volatile List<String> excludedPrincipalNameList = List.of();
     private final Set<ClientQuotaType> resetQuota = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private volatile ThrottleFactorSource throttleFactorSource = UnlimitedThrottleFactorSource.UNLIMITED_THROTTLE_FACTOR_SOURCE;
@@ -50,10 +57,10 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     /**
      * Default constructor for production use.
      * <p>
-     * It provides a default {@link io.strimzi.kafka.quotas.VolumeSourceBuilder#VolumeSourceBuilder()} and a single threaded executor for running background tasks on a named thread.
+     * It provides a default {@link io.strimzi.kafka.quotas.VolumeSourceBuilder#VolumeSourceBuilder()} and a scheduled executor for running background tasks on named threads.
      */
     public StaticQuotaCallback() {
-        this(new VolumeSourceBuilder(), Executors.newSingleThreadScheduledExecutor(r -> {
+        this(new VolumeSourceBuilder(), Executors.newScheduledThreadPool(2, r -> {
             final Thread thread = new Thread(r, StaticQuotaCallback.class.getSimpleName() + "-taskExecutor");
             thread.setDaemon(true);
             return thread;
@@ -89,9 +96,10 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
         double quota = quotaMap.getOrDefault(quotaType, Quota.upperBound(Double.MAX_VALUE)).bound();
         if (ClientQuotaType.PRODUCE.equals(quotaType)) {
-            quota = quota * throttleFactorSource.currentThrottleFactor();
+            ThrottleFactor factor = throttleFactorSource.currentThrottleFactor();
+            quota = quota * factor.getThrottleFactor();
         }
-        // returning zero would cause a divide by zero in Kafka so we return 1 at minimum
+        // returning zero would cause a divide by zero in Kafka, so we return 1 at minimum
         return Math.max(quota, 1d);
     }
 
@@ -125,7 +133,6 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
     }
 
-    @SuppressWarnings("deprecation")
     @Override
     public void configure(Map<String, ?> configs) {
         StaticQuotaConfig config = new StaticQuotaConfig(configs, true);
@@ -148,11 +155,13 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             } else {
                 throw new IllegalStateException("storageCheckInterval > 0 but no limit type configured");
             }
-            final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE));
+            FixedDurationExpiryPolicy expiryPolicy = new FixedDurationExpiryPolicy(Clock.systemUTC(), config.getThrottleFactorValidityDuration());
+            final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE), expiryPolicy, config.getFallbackThrottleFactor());
             throttleFactorSource = factorNotifier;
 
             Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(factorNotifier).build();
             backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckInterval, TimeUnit.SECONDS);
+            backgroundScheduler.scheduleWithFixedDelay(factorNotifier::checkThrottleFactorValidity, 0, 10, TimeUnit.SECONDS);
             log.info("Configured quota callback with {}. Storage check interval: {}s", quotaMap, storageCheckInterval);
         } else {
             log.info("Static quota callback configured to never check usage: set {} to a positive value to enable", StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP);
