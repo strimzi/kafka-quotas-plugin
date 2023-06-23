@@ -45,11 +45,6 @@ import static java.util.stream.Collectors.toSet;
 public class VolumeSource implements Runnable {
 
     /**
-     * Tag used for metrics to identify the borker which is recording the observation.
-     */
-    public static final String HOST_BROKER_TAG = "observingBrokerId";
-
-    /**
      * Tag used for metrics to identify the borker which generated the observation.
      */
     public static final String REMOTE_BROKER_TAG = "remoteBrokerId";
@@ -59,30 +54,30 @@ public class VolumeSource implements Runnable {
      */
     public static final String LOG_DIR_TAG = "logDir";
 
-    private static final LinkedHashMap<String, String> DEFAULT_TAGS = new LinkedHashMap<>();
     private final VolumeObserver volumeObserver;
     private final Admin admin;
     private final int timeout;
     private final TimeUnit timeoutUnit;
+    private final LinkedHashMap<String, String> defaultTags;
 
     private static final Logger log = LoggerFactory.getLogger(VolumeSource.class);
 
     /**
      * Creates a volume source.
      *
-     * @param localBrokerId  The id of the broker executing the volume source. Primarily for metrics.
      * @param admin          The Kafka Admin client to be used for gathering information.
      * @param volumeObserver the listener to be notified of the volume usage
      * @param timeout        how long should we wait for cluster information
      * @param timeoutUnit    What unit is the timeout configured in
+     * @param defaultTags    The minimum collection of tags to add each metric.
      */
     @SuppressFBWarnings("EI_EXPOSE_REP2") //Injecting the dependency is the right move as it can be shared
-    public VolumeSource(String localBrokerId, Admin admin, VolumeObserver volumeObserver, int timeout, TimeUnit timeoutUnit) {
+    public VolumeSource(Admin admin, VolumeObserver volumeObserver, int timeout, TimeUnit timeoutUnit, LinkedHashMap<String, String> defaultTags) {
         this.volumeObserver = volumeObserver;
         this.admin = admin;
         this.timeout = timeout;
         this.timeoutUnit = timeoutUnit;
-        DEFAULT_TAGS.put(HOST_BROKER_TAG, localBrokerId);
+        this.defaultTags = defaultTags;
     }
 
     @Override
@@ -143,10 +138,10 @@ public class VolumeSource implements Runnable {
         final Set<Integer> allBrokerIds = nodes.stream().map(Node::id).collect(toSet());
         log.debug("Attempting to describe logDirs");
         return toResultStage(admin.describeLogDirs(allBrokerIds).allDescriptions())
-                .thenApply(VolumeSource::onDescribeLogDirComplete);
+                .thenApply(this::onDescribeLogDirComplete);
     }
 
-    private static VolumeUsageResult onDescribeLogDirComplete(Result<Map<Integer, Map<String, LogDirDescription>>> logDirResult) {
+    private VolumeUsageResult onDescribeLogDirComplete(Result<Map<Integer, Map<String, LogDirDescription>>> logDirResult) {
         if (logDirResult.isFailure()) {
             return failure(VolumeSourceObservationStatus.DESCRIBE_LOG_DIR_ERROR, logDirResult.getThrowable());
         } else {
@@ -154,7 +149,7 @@ public class VolumeSource implements Runnable {
         }
     }
 
-    private static VolumeUsageResult onDescribeLogDirSuccess(Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker) {
+    private VolumeUsageResult onDescribeLogDirSuccess(Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker) {
         if (log.isDebugEnabled()) {
             log.debug("Successfully described logDirs: " + logDirsPerBroker);
         }
@@ -165,7 +160,7 @@ public class VolumeSource implements Runnable {
                 .collect(Collectors.toUnmodifiableList());
 
         volumeUsages.forEach(volumeUsage -> {
-            final LinkedHashMap<String, String> tags = new LinkedHashMap<>(DEFAULT_TAGS);
+            final LinkedHashMap<String, String> tags = new LinkedHashMap<>(defaultTags);
             tags.put(REMOTE_BROKER_TAG, volumeUsage.getBrokerId());
             tags.put(LOG_DIR_TAG, volumeUsage.getLogDir());
             Metrics.newGauge(metricName(VolumeSource.class,  "consumed_bytes", tags), new Gauge<>() {

@@ -4,6 +4,7 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.util.LinkedHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
@@ -22,6 +23,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
     private Admin adminClient;
     private StaticQuotaConfig config;
     private VolumeObserver volumeObserver;
+    private LinkedHashMap<String, String> defaultTags = new LinkedHashMap<>();
 
     /**
      * Default production constructor for production usage.
@@ -60,6 +62,16 @@ public class VolumeSourceBuilder implements AutoCloseable {
         return this;
     }
 
+    /**
+     * Provide the default set of tags to add to metrics.
+     * @param defaultTags A linked hash map (for deterministic order) of key value pairs to add to each metric
+     * @return this to allow fluent usage of the builder.
+     */
+    public VolumeSourceBuilder withDefaultTags(LinkedHashMap<String, String> defaultTags) {
+        this.defaultTags = defaultTags;
+        return this;
+    }
+
     VolumeSource build() {
         if (!config.isSupportsKip827()) {
             throw new IllegalStateException("KIP-827 not available, this plugin requires broker version >= 3.3");
@@ -67,15 +79,14 @@ public class VolumeSourceBuilder implements AutoCloseable {
         adminClient = adminClientFactory.apply(config.getKafkaClientConfig());
         //Timeout just before the next job will be scheduled to run to avoid tasks queuing on the client thread pool.
         final int timeout = config.getStorageCheckInterval() - 1;
-        final String localBrokerId = this.config.getBrokerId();
-        return new VolumeSource(localBrokerId, adminClient, volumeObserver, timeout, TimeUnit.SECONDS);
+        return new VolumeSource(adminClient, volumeObserver, timeout, TimeUnit.SECONDS, defaultTags);
     }
+
     @Override
     public void close() {
         if (adminClient != null) {
             adminClient.close();
         }
     }
-
 
 }

@@ -6,8 +6,13 @@ package io.strimzi.kafka.quotas.throttle;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.SortedMap;
 
+import com.yammer.metrics.core.Metric;
+import com.yammer.metrics.core.MetricName;
+import io.strimzi.kafka.quotas.StaticQuotaCallback;
 import io.strimzi.kafka.quotas.TickableClock;
 import io.strimzi.kafka.quotas.VolumeUsage;
 import io.strimzi.kafka.quotas.VolumeUsageResult;
@@ -15,6 +20,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import static io.strimzi.kafka.quotas.MetricUtils.assertGaugeMetric;
+import static io.strimzi.kafka.quotas.MetricUtils.getMetricGroup;
 import static io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus.INTERRUPTED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,14 +34,19 @@ class PolicyBasedThrottleTest {
 
     private final Runnable runnable = Mockito.mock(Runnable.class);
 
-    private ExpiryPolicy expiryPolicy = Mockito.mock(ExpiryPolicy.class);
+    private final ExpiryPolicy expiryPolicy = Mockito.mock(ExpiryPolicy.class);
+
     private PolicyBasedThrottle policyBasedThrottle;
+
     private TickableClock clock;
+    private LinkedHashMap<String, String> defaultTags;
 
     @BeforeEach
     void setUp() {
         clock = new TickableClock();
-        policyBasedThrottle = new PolicyBasedThrottle(THROTTLE_FACTOR_POLICY, runnable, clock, expiryPolicy, 0.0);
+        defaultTags = new LinkedHashMap<>();
+        defaultTags.put(StaticQuotaCallback.HOST_BROKER_TAG, "1");
+        policyBasedThrottle = new PolicyBasedThrottle(THROTTLE_FACTOR_POLICY, runnable, clock, expiryPolicy, 0.0, defaultTags);
         assertThat(policyBasedThrottle.currentThrottleFactor().getThrottleFactor()).isEqualTo(1.0d);
     }
 
@@ -71,6 +83,30 @@ class PolicyBasedThrottleTest {
         Instant now = givenFixedTimeProgressedOneMinute();
         whenVolumeUsageResultSuccessObserved();
         thenCurrentThrottleFactorValidFrom(now);
+    }
+
+    @Test
+    void shouldInitialiseQuotaFactorGauge() {
+        //Given
+
+        //When
+
+        //Then
+        final SortedMap<MetricName, Metric> throttleFactorMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "ThrottleFactor");
+        assertGaugeMetric(throttleFactorMetrics, "ThrottleFactor", defaultTags, 1.0);
+    }
+
+    @Test
+    void shouldUpdateGauageWhenFactorChanges() {
+        //Given
+        givenFactorIsCurrent();
+
+        //When
+        whenVolumeUsageResultSuccessObserved();
+
+        //Then
+        final SortedMap<MetricName, Metric> throttleFactorMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "ThrottleFactor");
+        assertGaugeMetric(throttleFactorMetrics, "ThrottleFactor", defaultTags, 1.0);
     }
 
     private void thenCurrentThrottleFactorValidFrom(Instant now) {

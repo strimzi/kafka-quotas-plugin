@@ -5,13 +5,17 @@
 package io.strimzi.kafka.quotas.throttle;
 
 import java.time.Clock;
+import java.util.LinkedHashMap;
 import java.util.function.Function;
 
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Gauge;
 import io.strimzi.kafka.quotas.VolumeObserver;
 import io.strimzi.kafka.quotas.VolumeUsageResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static io.strimzi.kafka.quotas.StaticQuotaCallback.metricName;
 import static io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus.SUCCESS;
 
 
@@ -30,22 +34,30 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
 
     /**
      * Creates a policy based throttle.
-     * @param factorPolicy Which policy to apply
-     * @param listener     the lister to be notified of changes
-     * @param expiryPolicy expiry policy to control how long a factor is applied for
+     *
+     * @param factorPolicy           Which policy to apply
+     * @param listener               the lister to be notified of changes
+     * @param expiryPolicy           expiry policy to control how long a factor is applied for
      * @param fallbackThrottleFactor throttle factor to apply if a factor reaches its expiry
+     * @param defaultTags            The minimum collection of tags to add each metric.
      */
-    public PolicyBasedThrottle(ThrottleFactorPolicy factorPolicy, Runnable listener, ExpiryPolicy expiryPolicy, double fallbackThrottleFactor) {
-        this(factorPolicy, listener, Clock.systemUTC(), expiryPolicy, fallbackThrottleFactor);
+    public PolicyBasedThrottle(ThrottleFactorPolicy factorPolicy, Runnable listener, ExpiryPolicy expiryPolicy, double fallbackThrottleFactor, LinkedHashMap<String, String> defaultTags) {
+        this(factorPolicy, listener, Clock.systemUTC(), expiryPolicy, fallbackThrottleFactor, defaultTags);
     }
 
-    /* test */ PolicyBasedThrottle(ThrottleFactorPolicy factorPolicy, Runnable listener, Clock clock, ExpiryPolicy expiryPolicy, double fallbackThrottleFactor) {
+    /* test */ PolicyBasedThrottle(ThrottleFactorPolicy factorPolicy, Runnable listener, Clock clock, ExpiryPolicy expiryPolicy, double fallbackThrottleFactor, LinkedHashMap<String, String> defaultTags) {
         this.factorPolicy = factorPolicy;
         this.listener = listener;
         this.clock = clock;
         this.expiryPolicy = expiryPolicy;
         throttleFactor = ThrottleFactor.validFactor(1.0d, clock.instant(), this.expiryPolicy);
         this.fallbackThrottleFactor = fallbackThrottleFactor;
+        Metrics.newGauge(metricName("ThrottleFactor", "ThrottleFactor", "io.strimzi.kafka.quotas", defaultTags), new Gauge<>() {
+            @Override
+            public Object value() {
+                return throttleFactor.getThrottleFactor();
+            }
+        });
     }
 
     @Override

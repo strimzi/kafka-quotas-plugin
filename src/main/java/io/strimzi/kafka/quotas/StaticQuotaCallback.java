@@ -57,6 +57,12 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final ScheduledExecutorService backgroundScheduler;
 
     /**
+     * Tag used for metrics to identify the broker which is recording the observation.
+     */
+    public static final String HOST_BROKER_TAG = "observingBrokerId";
+
+
+    /**
      * Default constructor for production use.
      * <p>
      * It provides a default {@link io.strimzi.kafka.quotas.VolumeSourceBuilder#VolumeSourceBuilder()} and a scheduled executor for running background tasks on named threads.
@@ -141,6 +147,9 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         quotaMap = config.getQuotaMap();
         long storageCheckInterval = config.getStorageCheckInterval();
         if (storageCheckInterval > 0L) {
+            LinkedHashMap<String, String> defaultTags = new LinkedHashMap<>();
+            defaultTags.put("observingBrokerId", config.getBrokerId());
+
             final Optional<Long> availableBytesLimitConfig = config.getAvailableBytesLimit();
             final Optional<Double> availableRatioLimit = config.getAvailableRatioLimit();
             if (availableBytesLimitConfig.isPresent() && availableRatioLimit.isPresent()) {
@@ -158,10 +167,10 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
                 throw new IllegalStateException("storageCheckInterval > 0 but no limit type configured");
             }
             FixedDurationExpiryPolicy expiryPolicy = new FixedDurationExpiryPolicy(Clock.systemUTC(), config.getThrottleFactorValidityDuration());
-            final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE), expiryPolicy, config.getFallbackThrottleFactor());
+            final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE), expiryPolicy, config.getFallbackThrottleFactor(), defaultTags);
             throttleFactorSource = factorNotifier;
 
-            Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(factorNotifier).build();
+            Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(factorNotifier).withDefaultTags(defaultTags).build();
             backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckInterval, TimeUnit.SECONDS);
             backgroundScheduler.scheduleWithFixedDelay(factorNotifier::checkThrottleFactorValidity, 0, 10, TimeUnit.SECONDS);
             log.info("Configured quota callback with {}. Storage check interval: {}s", quotaMap, storageCheckInterval);
@@ -199,19 +208,27 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         return metricName(name, type, group);
     }
 
-    static MetricName metricName(String name, String type, String group) {
+    /**
+     * Generate an mBean metric name
+     * @param name  the name of the Metric.
+     * @param type  the type to which the Metric belongs.
+     * @param group the group to which the Metric belongs type
+     * @return the MetricName object derived from the arguments.
+     */
+    public static MetricName metricName(String name, String type, String group) {
         String mBeanName = String.format("%s:type=%s,name=%s", group, type, name);
         return new MetricName(group, type, name, SCOPE, mBeanName);
     }
 
     /**
+     * Generate an mBean metric name
      * @param name  the name of the Metric.
      * @param type  the type to which the Metric belongs.
      * @param group the group to which the Metric belongs type
      * @param tags  an ordered set of key value mappings
      * @return the MetricName object derived from the arguments.
      */
-    static MetricName metricName(String name, String type, String group, LinkedHashMap<String, String> tags) {
+    public static MetricName metricName(String name, String type, String group, LinkedHashMap<String, String> tags) {
         final String tagValues = tags.entrySet().stream().map(entry -> String.format("%s=%s", entry.getKey(), entry.getValue())).collect(Collectors.joining(","));
         String mBeanName;
         if (!tagValues.isBlank()) {
