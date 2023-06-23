@@ -8,6 +8,7 @@ package io.strimzi.kafka.quotas;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
@@ -31,6 +32,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static io.strimzi.kafka.quotas.MetricUtils.assertGaugeMetric;
+import static io.strimzi.kafka.quotas.MetricUtils.getMetricGroup;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
@@ -39,6 +42,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class VolumeSourceTest {
 
+    private static final String LOCAL_NODE_ID = "3";
     private CapturingVolumeObserver capturingVolumeObserver;
     private VolumeSource volumeSource;
     @Mock
@@ -56,7 +60,7 @@ class VolumeSourceTest {
     @BeforeEach
     void setUp() {
         capturingVolumeObserver = new CapturingVolumeObserver();
-        volumeSource = new VolumeSource(admin, capturingVolumeObserver, 0, TimeUnit.SECONDS);
+        volumeSource = new VolumeSource(LOCAL_NODE_ID, admin, capturingVolumeObserver, 0, TimeUnit.SECONDS);
         when(describeClusterResult.nodes()).thenReturn(KafkaFuture.completedFuture(nodes));
         when(admin.describeCluster()).thenReturn(describeClusterResult);
         when(describeLogDirsResult.allDescriptions()).thenReturn(KafkaFuture.completedFuture(descriptions));
@@ -166,9 +170,10 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final SortedMap<MetricName, Metric> volumeSourceMetrics = MetricUtils.getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
-        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir1_consumed_bytes", 40L);
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", 40L);
     }
+
     @Test
     void shouldCreateAvailableBytesMetricForALogDir() {
         //Given
@@ -180,8 +185,8 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final SortedMap<MetricName, Metric> volumeSourceMetrics = MetricUtils.getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
-        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir1_available_bytes", 10L);
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        assertGaugeMetric(volumeSourceMetrics, "available_bytes", 10L);
     }
 
     @Test
@@ -199,16 +204,16 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final SortedMap<MetricName, Metric> volumeSourceMetrics = MetricUtils.getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
-        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir1_consumed_bytes", 40L);
-        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir2_consumed_bytes", 45L);
-        MetricUtils.assertGaugeMetric(volumeSourceMetrics, node2Id + "_dir3_consumed_bytes", 39L);
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", buildTagMap(nodeId, "dir1"), 40L);
+        assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", buildTagMap(nodeId, "dir2"), 45L);
+        assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", buildTagMap(node2Id, "dir3"), 39L);
     }
 
     @Test
     void shouldCreateAvailableBytesMetricForEachLogDir() {
         //Given
-        final int nodeId = 1;
+        final int nodeId = 5;
         final int node2Id = nodeId + 1;
         givenNode(nodeId);
         givenNode(node2Id);
@@ -220,10 +225,10 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final SortedMap<MetricName, Metric> volumeSourceMetrics = MetricUtils.getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
-        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir1_available_bytes", 10L);
-        MetricUtils.assertGaugeMetric(volumeSourceMetrics, nodeId + "_dir2_available_bytes", 15L);
-        MetricUtils.assertGaugeMetric(volumeSourceMetrics, node2Id + "_dir3_available_bytes", 1L);
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        assertGaugeMetric(volumeSourceMetrics, "available_bytes", buildTagMap(nodeId, "dir1"), 10L);
+        assertGaugeMetric(volumeSourceMetrics, "available_bytes", buildTagMap(nodeId, "dir2"), 15L);
+        assertGaugeMetric(volumeSourceMetrics, "available_bytes", buildTagMap(node2Id, "dir3"), 1L);
     }
 
     @Test
@@ -300,6 +305,14 @@ class VolumeSourceTest {
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
         final VolumeUsageResult onlyInvocation = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
         assertThat(onlyInvocation.getVolumeUsages()).isEmpty();
+    }
+
+    private static LinkedHashMap<String, String> buildTagMap(int remoteNodeId, String logDir) {
+        final LinkedHashMap<String, String> dir1Tags = new LinkedHashMap<>();
+        dir1Tags.put(VolumeSource.HOST_BROKER_TAG, LOCAL_NODE_ID);
+        dir1Tags.put(VolumeSource.REMOTE_BROKER_TAG, String.valueOf(remoteNodeId));
+        dir1Tags.put(VolumeSource.LOG_DIR_TAG, logDir);
+        return dir1Tags;
     }
 
     private static class CapturingVolumeObserver implements VolumeObserver {

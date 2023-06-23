@@ -7,6 +7,7 @@ package io.strimzi.kafka.quotas;
 import java.time.Clock;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -15,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Gauge;
@@ -185,6 +187,12 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
     }
 
+    static MetricName metricName(Class<?> clazz, String name, LinkedHashMap<String, String> tags) {
+        String group = clazz.getPackageName();
+        String type = clazz.getSimpleName();
+        return metricName(name, type, group, tags);
+    }
+
     static MetricName metricName(Class<?> clazz, String name) {
         String group = clazz.getPackageName();
         String type = clazz.getSimpleName();
@@ -193,6 +201,24 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     static MetricName metricName(String name, String type, String group) {
         String mBeanName = String.format("%s:type=%s,name=%s", group, type, name);
+        return new MetricName(group, type, name, SCOPE, mBeanName);
+    }
+
+    /**
+     * @param name  the name of the Metric.
+     * @param type  the type to which the Metric belongs.
+     * @param group the group to which the Metric belongs type
+     * @param tags  an ordered set of key value mappings
+     * @return the MetricName object derived from the arguments.
+     */
+    static MetricName metricName(String name, String type, String group, LinkedHashMap<String, String> tags) {
+        final String tagValues = tags.entrySet().stream().map(entry -> String.format("%s=%s", entry.getKey(), entry.getValue())).collect(Collectors.joining(","));
+        String mBeanName;
+        if (!tagValues.isBlank()) {
+            mBeanName = String.format("%s:type=%s,name=%s,%s", group, type, name, tagValues);
+        } else {
+            mBeanName = String.format("%s:type=%s,name=%s", group, type, name);
+        }
         return new MetricName(group, type, name, SCOPE, mBeanName);
     }
 

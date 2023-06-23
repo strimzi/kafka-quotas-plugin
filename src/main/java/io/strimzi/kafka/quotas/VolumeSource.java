@@ -6,6 +6,7 @@
 package io.strimzi.kafka.quotas;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,6 +44,22 @@ import static java.util.stream.Collectors.toSet;
  */
 public class VolumeSource implements Runnable {
 
+    /**
+     * Tag used for metrics to identify the borker which is recording the observation.
+     */
+    public static final String HOST_BROKER_TAG = "observingBrokerId";
+
+    /**
+     * Tag used for metrics to identify the borker which generated the observation.
+     */
+    public static final String REMOTE_BROKER_TAG = "remoteBrokerId";
+
+    /**
+     * Tag used for metrics to identify the logDir included in the observation.
+     */
+    public static final String LOG_DIR_TAG = "logDir";
+
+    private static final LinkedHashMap<String, String> DEFAULT_TAGS = new LinkedHashMap<>();
     private final VolumeObserver volumeObserver;
     private final Admin admin;
     private final int timeout;
@@ -53,17 +70,19 @@ public class VolumeSource implements Runnable {
     /**
      * Creates a volume source.
      *
+     * @param localBrokerId  The id of the broker executing the volume source. Primarily for metrics.
      * @param admin          The Kafka Admin client to be used for gathering information.
      * @param volumeObserver the listener to be notified of the volume usage
      * @param timeout        how long should we wait for cluster information
      * @param timeoutUnit    What unit is the timeout configured in
      */
     @SuppressFBWarnings("EI_EXPOSE_REP2") //Injecting the dependency is the right move as it can be shared
-    public VolumeSource(Admin admin, VolumeObserver volumeObserver, int timeout, TimeUnit timeoutUnit) {
+    public VolumeSource(String localBrokerId, Admin admin, VolumeObserver volumeObserver, int timeout, TimeUnit timeoutUnit) {
         this.volumeObserver = volumeObserver;
         this.admin = admin;
         this.timeout = timeout;
         this.timeoutUnit = timeoutUnit;
+        DEFAULT_TAGS.put(HOST_BROKER_TAG, localBrokerId);
     }
 
     @Override
@@ -146,13 +165,16 @@ public class VolumeSource implements Runnable {
                 .collect(Collectors.toUnmodifiableList());
 
         volumeUsages.forEach(volumeUsage -> {
-            Metrics.newGauge(metricName(VolumeSource.class, volumeUsage.getBrokerId() + "_" + volumeUsage.getLogDir() + "_consumed_bytes"), new Gauge<>() {
+            final LinkedHashMap<String, String> tags = new LinkedHashMap<>(DEFAULT_TAGS);
+            tags.put(REMOTE_BROKER_TAG, volumeUsage.getBrokerId());
+            tags.put(LOG_DIR_TAG, volumeUsage.getLogDir());
+            Metrics.newGauge(metricName(VolumeSource.class,  "consumed_bytes", tags), new Gauge<>() {
                 @Override
                 public Object value() {
                     return volumeUsage.getConsumedSpace();
                 }
             });
-            Metrics.newGauge(metricName(VolumeSource.class, volumeUsage.getBrokerId() + "_" + volumeUsage.getLogDir() + "_available_bytes"), new Gauge<>() {
+            Metrics.newGauge(metricName(VolumeSource.class, "available_bytes", tags), new Gauge<>() {
                 @Override
                 public Object value() {
                     return volumeUsage.getAvailableBytes();

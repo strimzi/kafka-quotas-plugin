@@ -67,13 +67,15 @@ public class VolumeSourceBuilder implements AutoCloseable {
         adminClient = adminClientFactory.apply(config.getKafkaClientConfig());
         //Timeout just before the next job will be scheduled to run to avoid tasks queuing on the client thread pool.
         final int timeout = config.getStorageCheckInterval() - 1;
-        return new VolumeSource(adminClient, volumeObserver, timeout, TimeUnit.SECONDS);
+        final String localBrokerId = this.config.getBrokerId();
+        return new VolumeSource(localBrokerId, adminClient, volumeObserver, timeout, TimeUnit.SECONDS);
     }
-
     @Override
     public void close() {
         if (adminClient != null) {
             adminClient.close();
         }
     }
+
+
 }

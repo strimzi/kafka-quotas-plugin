@@ -5,8 +5,10 @@
 
 package io.strimzi.kafka.quotas;
 
+import java.util.LinkedHashMap;
 import java.util.Optional;
 import java.util.SortedMap;
+import java.util.stream.Collectors;
 
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Gauge;
@@ -30,14 +32,32 @@ public class MetricUtils {
     }
 
     public static <T> void assertGaugeMetric(SortedMap<MetricName, Metric> metrics, String name, T expected) {
-        Optional<Gauge<T>> desired = findGaugeMetric(metrics, name);
-        assertTrue(desired.isPresent(), String.format("metric with name %s not found in %s", name, metrics));
+        assertGaugeMetric(metrics, name, null, expected);
+    }
+
+    public static <T> void assertGaugeMetric(SortedMap<MetricName, Metric> metrics, String name, LinkedHashMap<String, String> tags, T expected) {
+        final String expectedTags = tags != null ? tags.entrySet().stream().map(entry -> String.format("%s=%s", entry.getKey(), entry.getValue())).collect(Collectors.joining(",")) : null;
+        Optional<Gauge<T>> desired = findGaugeMetric(metrics, name, expectedTags);
+        assertTrue(desired.isPresent(), String.format("metric with name %s with tags: %s not found in %s", name, expectedTags, metrics));
         Gauge<T> gauge = desired.get();
         assertEquals(expected, gauge.value(), String.format("metric %s has unexpected value", name));
     }
 
     @SuppressWarnings("unchecked")
-    public static <T> Optional<Gauge<T>> findGaugeMetric(SortedMap<MetricName, Metric> metrics, String name) {
-        return metrics.entrySet().stream().filter(e -> name.equals(e.getKey().getName())).map(e -> (Gauge<T>) e.getValue()).findFirst();
+    public static <T> Optional<Gauge<T>> findGaugeMetric(SortedMap<MetricName, Metric> metrics, String name, String expectedTags) {
+        return metrics.entrySet().stream().filter(e -> {
+            final MetricName metricName = e.getKey();
+            if (name.equals(metricName.getName())) {
+                return expectedTags == null || expectedTags.equals(extractTags(name, metricName));
+            } else {
+                return false;
+            }
+        }).map(e -> (Gauge<T>) e.getValue()).findFirst();
+    }
+
+    private static String extractTags(String name, MetricName metricName) {
+        final String mBeanName = metricName.getMBeanName();
+        final int nameIndex = mBeanName.lastIndexOf(name);
+        return mBeanName.substring(nameIndex + name.length() + 1);
     }
 }

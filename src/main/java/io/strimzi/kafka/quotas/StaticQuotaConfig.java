@@ -159,6 +159,16 @@ public class StaticQuotaConfig extends AbstractConfig {
         }, () -> "Should be a valid iso8601 duration string like PT5M");
     }
 
+    /**
+     * Get the broker id of the current broker.
+     * @return the specified broker id or -1 if not defined.
+     */
+    public String getBrokerId() {
+        //Arguably in-efficient to look up the sys prop if we don't need it, but it reads better and is invoked rarely
+        final String brokerIdFromSysProps = System.getProperty("broker.id", "-1");
+        return this.originalsStrings().getOrDefault("broker.id", brokerIdFromSysProps);
+    }
+
 
     static class KafkaClientConfig extends AbstractConfig {
         public static final String CLIENT_ID_PREFIX_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.clientIdPrefix";
