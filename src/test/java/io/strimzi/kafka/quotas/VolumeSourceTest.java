@@ -333,6 +333,43 @@ class VolumeSourceTest {
         assertGaugeMetric(volumeSourceMetrics, "ActiveBrokers", buildBasicTagMap(), 2L);
     }
 
+    @Test
+    void shouldCountEachActiveLogDirInDescribeLogDirsResponse() {
+        //Given
+        final int nodeId = 1;
+        final int node2Id = nodeId + 1;
+        givenNode(nodeId);
+        givenNode(node2Id);
+        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        givenLogDirDescription(nodeId, "dir2", 60, 15);
+        givenLogDirDescription(node2Id, "dir3", 40, 1);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        assertGaugeMetric(volumeSourceMetrics, "ActiveLogDirs", buildBasicTagMap(), 3L);
+    }
+
+    @Test
+    void shouldCountEachValidLogDirInDescribeLogDirsResponse() {
+        //Given
+        final int nodeId = 1;
+        final int node2Id = nodeId + 1;
+        givenNode(nodeId);
+        givenNode(node2Id);
+        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        givenLogDirDescription(nodeId, "dir2", -1, -1);
+        givenLogDirDescription(node2Id, "dir3", 40, 1);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        assertGaugeMetric(volumeSourceMetrics, "ActiveLogDirs", buildBasicTagMap(), 2L);
+    }
     private static LinkedHashMap<String, String> buildTagMap(int remoteNodeId, String logDir) {
         final LinkedHashMap<String, String> tags = buildBasicTagMap();
         tags.put(VolumeSource.REMOTE_BROKER_TAG, String.valueOf(remoteNodeId));

@@ -63,6 +63,8 @@ public class VolumeSource implements Runnable {
 
     private final AtomicLong activeBrokerCount = new AtomicLong(0L);
 
+    private final AtomicLong activeLogDirsCount = new AtomicLong(0L);
+
     private static final Logger log = LoggerFactory.getLogger(VolumeSource.class);
 
     /**
@@ -81,12 +83,8 @@ public class VolumeSource implements Runnable {
         this.timeout = timeout;
         this.timeoutUnit = timeoutUnit;
         this.defaultTags = defaultTags;
-        Metrics.newGauge(metricName("ActiveBrokers", "VolumeSource", "io.strimzi.kafka.quotas", defaultTags), new Gauge<Long>() {
-            @Override
-            public Long value() {
-                return activeBrokerCount.get();
-            }
-        });
+        Metrics.newGauge(metricName("ActiveBrokers", "VolumeSource", "io.strimzi.kafka.quotas", defaultTags), new AtomicLongGauge(activeBrokerCount));
+        Metrics.newGauge(metricName("ActiveLogDirs", "VolumeSource", "io.strimzi.kafka.quotas", defaultTags), new AtomicLongGauge(activeLogDirsCount));
     }
 
     @Override
@@ -168,6 +166,8 @@ public class VolumeSource implements Runnable {
                 .flatMap(VolumeSource::toVolumes)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toUnmodifiableList());
+
+        activeLogDirsCount.set(volumeUsages.size());
 
         volumeUsages.forEach(volumeUsage -> {
             final LinkedHashMap<String, String> tags = new LinkedHashMap<>(defaultTags);
@@ -256,4 +256,17 @@ public class VolumeSource implements Runnable {
         }
     }
 
+    private static class AtomicLongGauge extends Gauge<Long> {
+
+        private final AtomicLong atomicLong;
+
+        private AtomicLongGauge(AtomicLong atomicLong) {
+            this.atomicLong = atomicLong;
+        }
+
+        @Override
+        public Long value() {
+            return atomicLong.get();
+        }
+    }
 }
