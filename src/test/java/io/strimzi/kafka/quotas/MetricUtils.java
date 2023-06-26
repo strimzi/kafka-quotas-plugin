@@ -92,7 +92,11 @@ public class MetricUtils {
     private static String extractTags(String name, MetricName metricName) {
         final String mBeanName = metricName.getMBeanName();
         final int nameIndex = mBeanName.lastIndexOf(name);
-        return mBeanName.substring(nameIndex + name.length() + 1);
+        if (mBeanName.length() <= nameIndex + name.length() + 1) {
+            return "";
+        } else {
+            return mBeanName.substring(nameIndex + name.length() + 1);
+        }
     }
 
     private static SortedMap<String, SortedMap<MetricName, Metric>> getGroupedMetrics(String scope, String type) {

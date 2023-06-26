@@ -314,12 +314,36 @@ class VolumeSourceTest {
         assertThat(onlyInvocation.getVolumeUsages()).isEmpty();
     }
 
+    @Test
+    void shouldCountEachActiveBrokerInDescribeClusterResponse() {
+        //Given
+        final int nodeId = 1;
+        final int node2Id = nodeId + 1;
+        givenNode(nodeId);
+        givenNode(node2Id);
+        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        givenLogDirDescription(nodeId, "dir2", 60, 15);
+        givenLogDirDescription(node2Id, "dir3", 40, 1);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        assertGaugeMetric(volumeSourceMetrics, "ActiveBrokers", buildBasicTagMap(), 2L);
+    }
+
     private static LinkedHashMap<String, String> buildTagMap(int remoteNodeId, String logDir) {
-        final LinkedHashMap<String, String> dir1Tags = new LinkedHashMap<>();
-        dir1Tags.put(HOST_BROKER_TAG, LOCAL_NODE_ID);
-        dir1Tags.put(VolumeSource.REMOTE_BROKER_TAG, String.valueOf(remoteNodeId));
-        dir1Tags.put(VolumeSource.LOG_DIR_TAG, logDir);
-        return dir1Tags;
+        final LinkedHashMap<String, String> tags = buildBasicTagMap();
+        tags.put(VolumeSource.REMOTE_BROKER_TAG, String.valueOf(remoteNodeId));
+        tags.put(VolumeSource.LOG_DIR_TAG, logDir);
+        return tags;
+    }
+
+    private static LinkedHashMap<String, String> buildBasicTagMap() {
+        final LinkedHashMap<String, String> tags = new LinkedHashMap<>();
+        tags.put(HOST_BROKER_TAG, LOCAL_NODE_ID);
+        return tags;
     }
 
     private static class CapturingVolumeObserver implements VolumeObserver {

@@ -16,6 +16,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -60,6 +61,8 @@ public class VolumeSource implements Runnable {
     private final TimeUnit timeoutUnit;
     private final LinkedHashMap<String, String> defaultTags;
 
+    private final AtomicLong activeBrokerCount = new AtomicLong(0L);
+
     private static final Logger log = LoggerFactory.getLogger(VolumeSource.class);
 
     /**
@@ -78,6 +81,12 @@ public class VolumeSource implements Runnable {
         this.timeout = timeout;
         this.timeoutUnit = timeoutUnit;
         this.defaultTags = defaultTags;
+        Metrics.newGauge(metricName("ActiveBrokers", "VolumeSource", "io.strimzi.kafka.quotas", defaultTags), new Gauge<Long>() {
+            @Override
+            public Long value() {
+                return activeBrokerCount.get();
+            }
+        });
     }
 
     @Override
@@ -136,6 +145,7 @@ public class VolumeSource implements Runnable {
 
     private CompletionStage<VolumeUsageResult> onDescribeClusterSuccess(Collection<Node> nodes) {
         final Set<Integer> allBrokerIds = nodes.stream().map(Node::id).collect(toSet());
+        activeBrokerCount.set(allBrokerIds.size());
         log.debug("Attempting to describe logDirs");
         return toResultStage(admin.describeLogDirs(allBrokerIds).allDescriptions())
                 .thenApply(this::onDescribeLogDirComplete);
