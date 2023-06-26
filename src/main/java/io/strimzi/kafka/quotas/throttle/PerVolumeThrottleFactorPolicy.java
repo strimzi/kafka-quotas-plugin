@@ -4,10 +4,15 @@
  */
 package io.strimzi.kafka.quotas.throttle;
 
+import java.util.Collection;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Counter;
 import io.strimzi.kafka.quotas.VolumeUsage;
 
-import java.util.Collection;
-import java.util.Optional;
+import static io.strimzi.kafka.quotas.StaticQuotaCallback.metricName;
 
 /**
  * Base Policy for limit types where we want a circuit-breaker type behaviour, throttling to a zero factor
@@ -19,12 +24,19 @@ import java.util.Optional;
  */
 abstract class PerVolumeThrottleFactorPolicy implements ThrottleFactorPolicy {
 
+    private final Counter limitViolationCounter;
+
+    public PerVolumeThrottleFactorPolicy() {
+        limitViolationCounter = Metrics.newCounter(metricName("LimitViolated", "ThrottleFactor", "io.strimzi.kafka.quotas"));
+    }
+
     abstract boolean shouldThrottle(VolumeUsage usage);
 
     @Override
     public double calculateFactor(Collection<VolumeUsage> observedVolumes) {
-        Optional<VolumeUsage> anyViolation = observedVolumes.stream().filter(this::shouldThrottle).findAny();
-        return anyViolation.isPresent() ? 0.0d : 1.0d;
+        Set<VolumeUsage> violations = observedVolumes.stream().filter(this::shouldThrottle).collect(Collectors.toUnmodifiableSet());
+        limitViolationCounter.inc(violations.size());
+        return violations.isEmpty() ? 1.0d : 0.0d;
     }
 
 }
