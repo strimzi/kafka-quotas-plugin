@@ -24,7 +24,9 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static io.strimzi.kafka.quotas.MetricUtils.METRICS_SCOPE;
 import static io.strimzi.kafka.quotas.MetricUtils.getMetricGroup;
+import static io.strimzi.kafka.quotas.MetricUtils.resetMetrics;
 import static io.strimzi.kafka.quotas.VolumeUsageResult.success;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.offset;
@@ -47,6 +49,7 @@ class StaticQuotaCallbackTest {
     private static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, String.valueOf(STORAGE_CHECK_INTERVAL), StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", StaticQuotaConfig.AVAILABLE_BYTES_PROP, "2");
     private static final long VOLUME_CAPACITY = 50;
     public static final long THROTTLE_FACTOR_EXPIRY_INTERVAL = 10L;
+    private static final String METRICS_TYPE = "StaticQuotaCallback";
 
     @Mock(lenient = true)
     VolumeSourceBuilder volumeSourceBuilder;
@@ -71,6 +74,7 @@ class StaticQuotaCallbackTest {
     @AfterEach
     void tearDown() {
         target.close();
+        resetMetrics(METRICS_SCOPE, METRICS_TYPE);
     }
 
     @Test
@@ -280,7 +284,7 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
         ));
 
-        SortedMap<MetricName, Metric> group = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "StaticQuotaCallback");
+        SortedMap<MetricName, Metric> group = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
 
         MetricUtils.assertGaugeMetric(group, "Produce", 15.0);
         MetricUtils.assertGaugeMetric(group, "Fetch", 16.0);

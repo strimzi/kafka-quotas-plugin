@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.function.Function;
 
 import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.Gauge;
 import io.strimzi.kafka.quotas.VolumeObserver;
 import io.strimzi.kafka.quotas.VolumeUsageResult;
@@ -31,6 +32,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
     private final Clock clock;
     private volatile ThrottleFactor throttleFactor;
     private final double fallbackThrottleFactor;
+    private final Counter fallbackAppliedCounter;
 
     /**
      * Creates a policy based throttle.
@@ -50,7 +52,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
         this.listener = listener;
         this.clock = clock;
         this.expiryPolicy = expiryPolicy;
-        throttleFactor = ThrottleFactor.validFactor(1.0d, clock.instant(), this.expiryPolicy);
+        this.throttleFactor = ThrottleFactor.validFactor(1.0d, clock.instant(), this.expiryPolicy);
         this.fallbackThrottleFactor = fallbackThrottleFactor;
         Metrics.newGauge(metricName("ThrottleFactor", "ThrottleFactor", "io.strimzi.kafka.quotas", defaultTags), new Gauge<>() {
             @Override
@@ -58,6 +60,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
                 return throttleFactor.getThrottleFactor();
             }
         });
+        fallbackAppliedCounter = Metrics.newCounter(metricName("FallbackThrottleFactorApplied", "ThrottleFactor", "io.strimzi.kafka.quotas"));
     }
 
     @Override
@@ -112,6 +115,7 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
 
     private ThrottleFactor maybeFallback(ThrottleFactor currentFactor) {
         if (currentFactor.isExpired()) {
+            fallbackAppliedCounter.inc();
             return ThrottleFactor.fallbackThrottleFactor(fallbackThrottleFactor);
         } else {
             return currentFactor;

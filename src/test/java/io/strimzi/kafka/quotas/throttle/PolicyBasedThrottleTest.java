@@ -20,8 +20,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import static io.strimzi.kafka.quotas.MetricUtils.METRICS_SCOPE;
+import static io.strimzi.kafka.quotas.MetricUtils.assertCounterMetric;
 import static io.strimzi.kafka.quotas.MetricUtils.assertGaugeMetric;
 import static io.strimzi.kafka.quotas.MetricUtils.getMetricGroup;
+import static io.strimzi.kafka.quotas.MetricUtils.resetMetrics;
 import static io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus.INTERRUPTED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,6 +34,7 @@ import static org.mockito.Mockito.when;
 class PolicyBasedThrottleTest {
 
     public static final ThrottleFactorPolicy THROTTLE_FACTOR_POLICY = observedVolumes -> 1.0;
+    private static final String METRICS_TYPE = "ThrottleFactor";
 
     private final Runnable runnable = Mockito.mock(Runnable.class);
 
@@ -43,6 +47,7 @@ class PolicyBasedThrottleTest {
 
     @BeforeEach
     void setUp() {
+        resetMetrics(METRICS_SCOPE, METRICS_TYPE);
         clock = new TickableClock();
         defaultTags = new LinkedHashMap<>();
         defaultTags.put(StaticQuotaCallback.HOST_BROKER_TAG, "1");
@@ -92,12 +97,12 @@ class PolicyBasedThrottleTest {
         //When
 
         //Then
-        final SortedMap<MetricName, Metric> throttleFactorMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "ThrottleFactor");
-        assertGaugeMetric(throttleFactorMetrics, "ThrottleFactor", defaultTags, 1.0);
+        final SortedMap<MetricName, Metric> metricsGroup = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        assertGaugeMetric(metricsGroup, "ThrottleFactor", defaultTags, 1.0);
     }
 
     @Test
-    void shouldUpdateGauageWhenFactorChanges() {
+    void shouldUpdateGaugeWhenFactorChanges() {
         //Given
         givenFactorIsCurrent();
 
@@ -105,8 +110,88 @@ class PolicyBasedThrottleTest {
         whenVolumeUsageResultSuccessObserved();
 
         //Then
-        final SortedMap<MetricName, Metric> throttleFactorMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "ThrottleFactor");
-        assertGaugeMetric(throttleFactorMetrics, "ThrottleFactor", defaultTags, 1.0);
+        final SortedMap<MetricName, Metric> metricsGroup = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        assertGaugeMetric(metricsGroup, "ThrottleFactor", defaultTags, 1.0);
+    }
+
+    @Test
+    public void shouldNotIncrementFallbackFactorApplied() {
+        //Given
+        givenFactorIsCurrent();
+
+        //When
+        whenVolumeUsageResultFailureObserved();
+
+        //Then
+        final SortedMap<MetricName, Metric> metricsGroup = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        //Assert zero as the previous factor is still considered valid.
+        assertCounterMetric(metricsGroup, "FallbackThrottleFactorApplied", 0L);
+    }
+
+    @Test
+    public void shouldCountFallbackFactorApplied() {
+        //Given
+        givenFactorIsExpired();
+
+        //When
+        whenCheckForStaleFactor(policyBasedThrottle);
+
+        //Then
+        final SortedMap<MetricName, Metric> metricsGroup = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        assertCounterMetric(metricsGroup, "FallbackThrottleFactorApplied", 1L);
+    }
+
+    @Test
+    public void shouldNotCountFallbackFactorAppliedWhenFactorIsValid() {
+        //Given
+        final FixedDurationExpiryPolicy oneMinuteExpiryPolicy = new FixedDurationExpiryPolicy(clock, Duration.ofMinutes(1L));
+        policyBasedThrottle = new PolicyBasedThrottle(THROTTLE_FACTOR_POLICY, runnable, clock, oneMinuteExpiryPolicy, 0.0, defaultTags);
+
+        givenFixedTimeProgressedOneMinute();
+
+        //When
+        whenVolumeUsageResultFailureObserved();
+
+        //Then
+        final SortedMap<MetricName, Metric> metricsGroup = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        assertCounterMetric(metricsGroup, "FallbackThrottleFactorApplied", 0L);
+    }
+
+    @Test
+    public void shouldIncrementFallbackFactorAppliedWhenPreviousFactorExpires() {
+        //Given
+        final FixedDurationExpiryPolicy thirtySecondExpiryPolicy = new FixedDurationExpiryPolicy(clock, Duration.ofSeconds(30L));
+        policyBasedThrottle = new PolicyBasedThrottle(THROTTLE_FACTOR_POLICY, runnable, clock, thirtySecondExpiryPolicy, 0.0, defaultTags);
+
+        givenFixedTimeProgressedOneMinute();
+
+        //When
+        whenVolumeUsageResultFailureObserved();
+
+        //Then
+        final SortedMap<MetricName, Metric> metricsGroup = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        assertCounterMetric(metricsGroup, "FallbackThrottleFactorApplied", 1L);
+    }
+
+    @Test
+    public void shouldIncrementFallbackFactorAppliedOnEachExpiry() {
+        //Given
+        final FixedDurationExpiryPolicy thirtySecondExpiryPolicy = new FixedDurationExpiryPolicy(clock, Duration.ofSeconds(30L));
+        policyBasedThrottle = new PolicyBasedThrottle(THROTTLE_FACTOR_POLICY, runnable, clock, thirtySecondExpiryPolicy, 0.0, defaultTags);
+
+        givenFixedTimeProgressedOneMinute();
+        whenVolumeUsageResultFailureObserved(); //expiry one
+
+        givenFixedTimeProgressedOneMinute();
+        whenVolumeUsageResultSuccessObserved(); //expiry return to normal
+
+        //When
+        givenFixedTimeProgressedOneMinute();
+        whenVolumeUsageResultFailureObserved(); //expiry two
+
+        //Then
+        final SortedMap<MetricName, Metric> metricsGroup = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        assertCounterMetric(metricsGroup, "FallbackThrottleFactorApplied", 2L);
     }
 
     private void thenCurrentThrottleFactorValidFrom(Instant now) {

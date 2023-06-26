@@ -32,8 +32,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static io.strimzi.kafka.quotas.MetricUtils.METRICS_SCOPE;
 import static io.strimzi.kafka.quotas.MetricUtils.assertGaugeMetric;
 import static io.strimzi.kafka.quotas.MetricUtils.getMetricGroup;
+import static io.strimzi.kafka.quotas.MetricUtils.resetMetrics;
 import static io.strimzi.kafka.quotas.StaticQuotaCallback.HOST_BROKER_TAG;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -44,6 +46,7 @@ import static org.mockito.Mockito.when;
 class VolumeSourceTest {
 
     private static final String LOCAL_NODE_ID = "3";
+    private static final String METRICS_TYPE = "VolumeSource";
     private CapturingVolumeObserver capturingVolumeObserver;
     private VolumeSource volumeSource;
     @Mock
@@ -60,6 +63,7 @@ class VolumeSourceTest {
 
     @BeforeEach
     void setUp() {
+        resetMetrics(METRICS_SCOPE, METRICS_TYPE);
         capturingVolumeObserver = new CapturingVolumeObserver();
         final LinkedHashMap<String, String> tags = new LinkedHashMap<>();
         tags.put(HOST_BROKER_TAG, LOCAL_NODE_ID);
@@ -173,7 +177,7 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
         assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", 40L);
     }
 
@@ -188,7 +192,7 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
         assertGaugeMetric(volumeSourceMetrics, "available_bytes", 10L);
     }
 
@@ -207,7 +211,7 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
         assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", buildTagMap(nodeId, "dir1"), 40L);
         assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", buildTagMap(nodeId, "dir2"), 45L);
         assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", buildTagMap(node2Id, "dir3"), 39L);
@@ -228,7 +232,7 @@ class VolumeSourceTest {
         volumeSource.run();
 
         //Then
-        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "VolumeSource");
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
         assertGaugeMetric(volumeSourceMetrics, "available_bytes", buildTagMap(nodeId, "dir1"), 10L);
         assertGaugeMetric(volumeSourceMetrics, "available_bytes", buildTagMap(nodeId, "dir2"), 15L);
         assertGaugeMetric(volumeSourceMetrics, "available_bytes", buildTagMap(node2Id, "dir3"), 1L);
