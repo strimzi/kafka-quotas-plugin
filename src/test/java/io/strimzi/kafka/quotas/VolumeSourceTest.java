@@ -182,6 +182,42 @@ class VolumeSourceTest {
     }
 
     @Test
+    void shouldTrackEvolutionOfConsumedBytesMetricForALogDir() {
+        //Given
+        final int nodeId = 1;
+        givenNode(nodeId);
+        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        volumeSource.run();
+
+        givenLogDirDescription(nodeId, "dir1", 50, 20);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", 30L);
+    }
+
+    @Test
+    void shouldTrackEvolutionOfAvailableBytesMetricForALogDir() {
+        //Given
+        final int nodeId = 1;
+        givenNode(nodeId);
+        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        volumeSource.run();
+
+        givenLogDirDescription(nodeId, "dir1", 50, 20);
+
+        //When
+        volumeSource.run();
+
+        //Then
+        final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+        assertGaugeMetric(volumeSourceMetrics, "available_bytes", 20L);
+    }
+
+    @Test
     void shouldCreateAvailableBytesMetricForALogDir() {
         //Given
         final int nodeId = 1;

@@ -13,10 +13,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -64,6 +66,9 @@ public class VolumeSource implements Runnable {
     private final AtomicLong activeBrokerCount = new AtomicLong(0L);
 
     private final AtomicLong activeLogDirsCount = new AtomicLong(0L);
+
+    private final Map<String, Map<String, AtomicLong>> consumedBytesGauges = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, AtomicLong>> availableBytesGauges = new ConcurrentHashMap<>();
 
     private static final Logger log = LoggerFactory.getLogger(VolumeSource.class);
 
@@ -144,6 +149,10 @@ public class VolumeSource implements Runnable {
     private CompletionStage<VolumeUsageResult> onDescribeClusterSuccess(Collection<Node> nodes) {
         final Set<Integer> allBrokerIds = nodes.stream().map(Node::id).collect(toSet());
         activeBrokerCount.set(allBrokerIds.size());
+        allBrokerIds.forEach(brokerId -> {
+            availableBytesGauges.computeIfAbsent(String.valueOf(brokerId), key -> new ConcurrentHashMap<>());
+            consumedBytesGauges.computeIfAbsent(String.valueOf(brokerId), key -> new ConcurrentHashMap<>());
+        });
         log.debug("Attempting to describe logDirs");
         return toResultStage(admin.describeLogDirs(allBrokerIds).allDescriptions())
                 .thenApply(this::onDescribeLogDirComplete);
@@ -170,23 +179,29 @@ public class VolumeSource implements Runnable {
         activeLogDirsCount.set(volumeUsages.size());
 
         volumeUsages.forEach(volumeUsage -> {
-            final LinkedHashMap<String, String> tags = new LinkedHashMap<>(defaultTags);
-            tags.put(REMOTE_BROKER_TAG, volumeUsage.getBrokerId());
-            tags.put(LOG_DIR_TAG, volumeUsage.getLogDir());
-            Metrics.newGauge(metricName(VolumeSource.class,  "consumed_bytes", tags), new Gauge<>() {
-                @Override
-                public Object value() {
-                    return volumeUsage.getConsumedSpace();
-                }
-            });
-            Metrics.newGauge(metricName(VolumeSource.class, "available_bytes", tags), new Gauge<>() {
-                @Override
-                public Object value() {
-                    return volumeUsage.getAvailableBytes();
-                }
-            });
+            availableBytesGauges.get(volumeUsage.getBrokerId())
+                    .computeIfAbsent(volumeUsage.getLogDir(), buildCounter(volumeUsage, "available_bytes"))
+                    .set(volumeUsage.getAvailableBytes());
+            consumedBytesGauges.get(volumeUsage.getBrokerId())
+                    .computeIfAbsent(volumeUsage.getLogDir(), buildCounter(volumeUsage, "consumed_bytes"))
+                    .set(volumeUsage.getConsumedSpace());
         });
         return success(volumeUsages);
+    }
+
+    private Function<String, AtomicLong> buildCounter(VolumeUsage volumeUsage, String counterName) {
+        return logDir -> {
+            AtomicLong underlying = new AtomicLong(0);
+            Metrics.newGauge(metricName(VolumeSource.class, counterName, buildTagMap(volumeUsage)), new AtomicLongGauge(underlying));
+            return underlying;
+        };
+    }
+
+    private LinkedHashMap<String, String> buildTagMap(VolumeUsage volumeUsage) {
+        final LinkedHashMap<String, String> tags = new LinkedHashMap<>(defaultTags);
+        tags.put(REMOTE_BROKER_TAG, volumeUsage.getBrokerId());
+        tags.put(LOG_DIR_TAG, volumeUsage.getLogDir());
+        return tags;
     }
 
     private static Stream<? extends VolumeUsage> toVolumes(Map.Entry<Integer, Map<String, LogDirDescription>> brokerIdToLogDirs) {
