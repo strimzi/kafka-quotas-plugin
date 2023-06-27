@@ -81,7 +81,7 @@ public class VolumeSource implements Runnable {
      * @param timeoutUnit    What unit is the timeout configured in
      * @param defaultTags    The minimum collection of tags to add each metric.
      */
-    @SuppressFBWarnings("EI_EXPOSE_REP2") //Injecting the dependency is the right move as it can be shared
+    @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Injecting the dependency is the right move as it can be shared")
     public VolumeSource(Admin admin, VolumeObserver volumeObserver, int timeout, TimeUnit timeoutUnit, LinkedHashMap<String, String> defaultTags) {
         this.volumeObserver = volumeObserver;
         this.admin = admin;

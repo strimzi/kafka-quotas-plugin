@@ -67,6 +67,7 @@ public class VolumeSourceBuilder implements AutoCloseable {
      * @param defaultTags A linked hash map (for deterministic order) of key value pairs to add to each metric
      * @return this to allow fluent usage of the builder.
      */
+    @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "The tags are defensively copied at metric creation time to allow the defaults to be updated")
     public VolumeSourceBuilder withDefaultTags(LinkedHashMap<String, String> defaultTags) {
         this.defaultTags = defaultTags;
         return this;
