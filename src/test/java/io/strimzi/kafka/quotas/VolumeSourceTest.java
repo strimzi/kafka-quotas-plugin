@@ -178,7 +178,7 @@ class VolumeSourceTest {
 
         //Then
         final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
-        assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", 40L);
+        assertGaugeMetric(volumeSourceMetrics, "ConsumedBytes", 40L);
     }
 
     @Test
@@ -196,7 +196,7 @@ class VolumeSourceTest {
 
         //Then
         final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
-        assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", 30L);
+        assertGaugeMetric(volumeSourceMetrics, "ConsumedBytes", 30L);
     }
 
     @Test
@@ -214,7 +214,7 @@ class VolumeSourceTest {
 
         //Then
         final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
-        assertGaugeMetric(volumeSourceMetrics, "available_bytes", 20L);
+        assertGaugeMetric(volumeSourceMetrics, "AvailableBytes", 20L);
     }
 
     @Test
@@ -229,7 +229,7 @@ class VolumeSourceTest {
 
         //Then
         final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
-        assertGaugeMetric(volumeSourceMetrics, "available_bytes", 10L);
+        assertGaugeMetric(volumeSourceMetrics, "AvailableBytes", 10L);
     }
 
     @Test
@@ -248,9 +248,9 @@ class VolumeSourceTest {
 
         //Then
         final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
-        assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", buildTagMap(nodeId, "dir1"), 40L);
-        assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", buildTagMap(nodeId, "dir2"), 45L);
-        assertGaugeMetric(volumeSourceMetrics, "consumed_bytes", buildTagMap(node2Id, "dir3"), 39L);
+        assertGaugeMetric(volumeSourceMetrics, "ConsumedBytes", buildTagMap(nodeId, "dir1"), 40L);
+        assertGaugeMetric(volumeSourceMetrics, "ConsumedBytes", buildTagMap(nodeId, "dir2"), 45L);
+        assertGaugeMetric(volumeSourceMetrics, "ConsumedBytes", buildTagMap(node2Id, "dir3"), 39L);
     }
 
     @Test
@@ -269,9 +269,9 @@ class VolumeSourceTest {
 
         //Then
         final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
-        assertGaugeMetric(volumeSourceMetrics, "available_bytes", buildTagMap(nodeId, "dir1"), 10L);
-        assertGaugeMetric(volumeSourceMetrics, "available_bytes", buildTagMap(nodeId, "dir2"), 15L);
-        assertGaugeMetric(volumeSourceMetrics, "available_bytes", buildTagMap(node2Id, "dir3"), 1L);
+        assertGaugeMetric(volumeSourceMetrics, "AvailableBytes", buildTagMap(nodeId, "dir1"), 10L);
+        assertGaugeMetric(volumeSourceMetrics, "AvailableBytes", buildTagMap(nodeId, "dir2"), 15L);
+        assertGaugeMetric(volumeSourceMetrics, "AvailableBytes", buildTagMap(node2Id, "dir3"), 1L);
     }
 
     @Test

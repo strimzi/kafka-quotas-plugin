@@ -180,10 +180,10 @@ public class VolumeSource implements Runnable {
 
         volumeUsages.forEach(volumeUsage -> {
             availableBytesGauges.get(volumeUsage.getBrokerId())
-                    .computeIfAbsent(volumeUsage.getLogDir(), buildCounter(volumeUsage, "available_bytes"))
+                    .computeIfAbsent(volumeUsage.getLogDir(), buildCounter(volumeUsage, "AvailableBytes"))
                     .set(volumeUsage.getAvailableBytes());
             consumedBytesGauges.get(volumeUsage.getBrokerId())
-                    .computeIfAbsent(volumeUsage.getLogDir(), buildCounter(volumeUsage, "consumed_bytes"))
+                    .computeIfAbsent(volumeUsage.getLogDir(), buildCounter(volumeUsage, "ConsumedBytes"))
                     .set(volumeUsage.getConsumedSpace());
         });
         return success(volumeUsages);
