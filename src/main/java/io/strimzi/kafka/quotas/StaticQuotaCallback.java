@@ -210,18 +210,23 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     /**
      * Generate a Yammer metric name
+     *
      * @param name  the name of the Metric.
      * @param type  the type to which the Metric belongs.
      * @param group the group to which the Metric belongs type
      * @return the MetricName object derived from the arguments.
      */
     public static MetricName metricName(String name, String type, String group) {
-        String mBeanName = String.format("%s:type=%s,name=%s", group, type, name);
-        return new MetricName(group, type, name, SCOPE, mBeanName);
+        final String sanitisedGroup = sanitise(group);
+        final String sanitisedType = sanitise(type);
+        final String sanitisedName = sanitise(name);
+        String mBeanName = String.format("%s:type=%s,name=%s", sanitisedGroup, sanitisedType, sanitisedName);
+        return new MetricName(sanitisedGroup, sanitisedType, sanitisedName, SCOPE, mBeanName);
     }
 
     /**
      * Generate a Yammer metric name
+     *
      * @param name  the name of the Metric.
      * @param type  the type to which the Metric belongs.
      * @param group the group to which the Metric belongs type
@@ -229,14 +234,25 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
      * @return the MetricName object derived from the arguments.
      */
     public static MetricName metricName(String name, String type, String group, LinkedHashMap<String, String> tags) {
-        final String tagValues = tags.entrySet().stream().map(entry -> String.format("%s=%s", entry.getKey(), entry.getValue())).collect(Collectors.joining(","));
+        final String tagValues = tags.entrySet().stream().map(entry -> String.format("%s=%s", sanitise(entry.getKey()), sanitise(entry.getValue()))).collect(Collectors.joining(","));
         String mBeanName;
+        final String sanitisedGroup = sanitise(group);
+        final String sanitisedType = sanitise(type);
+        final String sanitisedName = sanitise(name);
         if (!tagValues.isBlank()) {
-            mBeanName = String.format("%s:type=%s,name=%s,%s", group, type, name, tagValues);
+            mBeanName = String.format("%s:type=%s,name=%s,%s", sanitisedGroup, sanitisedType, sanitisedName, tagValues);
         } else {
-            mBeanName = String.format("%s:type=%s,name=%s", group, type, name);
+            mBeanName = String.format("%s:type=%s,name=%s", sanitisedGroup, sanitisedType, sanitisedName);
         }
-        return new MetricName(group, type, name, SCOPE, mBeanName);
+        return new MetricName(sanitisedGroup, sanitisedType, sanitisedName, SCOPE, mBeanName);
+    }
+
+    private static String sanitise(String name) {
+        return name.replaceAll(":", "")
+                .replaceAll("\\?", "")
+                .replaceAll("\\*", "")
+                .replaceAll("//", "")
+                .replaceAll("\\$$", "");
     }
 
     private static class ClientQuotaGauge extends Gauge<Double> {

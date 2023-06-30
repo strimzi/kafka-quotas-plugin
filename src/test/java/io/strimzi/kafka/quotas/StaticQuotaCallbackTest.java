@@ -4,6 +4,7 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
@@ -19,6 +20,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -294,5 +297,88 @@ class StaticQuotaCallbackTest {
         MetricName name = group.firstKey();
         String expectedMbeanName = String.format("io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=%s", name.getName());
         assertEquals(expectedMbeanName, name.getMBeanName(), "unexpected mbean name");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    void shouldProduceValidMbeanObjectNamesWhenGroupContains(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource", "group" + illegalPattern);
+
+        //Then
+        assertThat(metricName.getGroup()).isEqualTo("group");
+        assertNameComponentIsValid(metricName.getMBeanName());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    void shouldProduceValidMbeanObjectNamesWhenTypeContains(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource" + illegalPattern, "group");
+
+        //Then
+        assertThat(metricName.getType()).isEqualTo("VolumeSource");
+        assertNameComponentIsValid(metricName.getMBeanName());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    void shouldProduceValidMbeanObjectNamesWhenTypeClassContains(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource" + illegalPattern, "group");
+
+        //Then
+        assertThat(metricName.getType()).isEqualTo("VolumeSource");
+        assertNameComponentIsValid(metricName.getMBeanName());
+    }
+
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    void shouldProduceValidMbeanObjectNamesWhenGroupContainsWithTags(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource", "group" + illegalPattern, new LinkedHashMap<>());
+
+        //Then
+        assertThat(metricName.getGroup()).isEqualTo("group");
+        assertNameComponentIsValid(metricName.getMBeanName());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    void shouldProduceValidMbeanObjectNamesWhenTypeContainsWithTags(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource" + illegalPattern, "group", new LinkedHashMap<>());
+
+        //Then
+        assertThat(metricName.getType()).isEqualTo("VolumeSource");
+        assertNameComponentIsValid(metricName.getMBeanName());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    void shouldProduceValidMbeanObjectNamesWhenTypeClassContainsWithTags(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource" + illegalPattern, "group", new LinkedHashMap<>());
+
+        //Then
+        assertThat(metricName.getType()).isEqualTo("VolumeSource");
+        assertNameComponentIsValid(metricName.getMBeanName());
+    }
+
+    private static void assertNameComponentIsValid(String component) {
+        assertThat(component).doesNotContain("$$", "//", "*", "?");
     }
 }
