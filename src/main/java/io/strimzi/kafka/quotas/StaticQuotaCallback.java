@@ -148,7 +148,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         long storageCheckInterval = config.getStorageCheckInterval();
         if (storageCheckInterval > 0L) {
             LinkedHashMap<String, String> defaultTags = new LinkedHashMap<>();
-            defaultTags.put("observingBrokerId", config.getBrokerId());
+            defaultTags.put(HOST_BROKER_TAG, config.getBrokerId());
 
             final Optional<Long> availableBytesLimitConfig = config.getAvailableBytesLimit();
             final Optional<Double> availableRatioLimit = config.getAvailableRatioLimit();
