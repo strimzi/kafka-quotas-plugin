@@ -209,7 +209,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     }
 
     /**
-     * Generate an mBean metric name
+     * Generate a Yammer metric name
      * @param name  the name of the Metric.
      * @param type  the type to which the Metric belongs.
      * @param group the group to which the Metric belongs type
@@ -221,7 +221,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     }
 
     /**
-     * Generate an mBean metric name
+     * Generate a Yammer metric name
      * @param name  the name of the Metric.
      * @param type  the type to which the Metric belongs.
      * @param group the group to which the Metric belongs type
