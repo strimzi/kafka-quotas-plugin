@@ -300,7 +300,7 @@ class StaticQuotaCallbackTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
     void shouldProduceValidMbeanObjectNamesWhenGroupContains(String name, String illegalPattern) {
         //Given
 
@@ -313,7 +313,7 @@ class StaticQuotaCallbackTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
     void shouldProduceValidMbeanObjectNamesWhenTypeContains(String name, String illegalPattern) {
         //Given
 
@@ -326,7 +326,7 @@ class StaticQuotaCallbackTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
     void shouldProduceValidMbeanObjectNamesWhenTypeClassContains(String name, String illegalPattern) {
         //Given
 
@@ -338,9 +338,8 @@ class StaticQuotaCallbackTest {
         assertNameComponentIsValid(metricName.getMBeanName());
     }
 
-
     @ParameterizedTest(name = "{0}")
-    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
     void shouldProduceValidMbeanObjectNamesWhenGroupContainsWithTags(String name, String illegalPattern) {
         //Given
 
@@ -353,7 +352,7 @@ class StaticQuotaCallbackTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
     void shouldProduceValidMbeanObjectNamesWhenTypeContainsWithTags(String name, String illegalPattern) {
         //Given
 
@@ -366,7 +365,7 @@ class StaticQuotaCallbackTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?"})
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
     void shouldProduceValidMbeanObjectNamesWhenTypeClassContainsWithTags(String name, String illegalPattern) {
         //Given
 

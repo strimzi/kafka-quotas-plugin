@@ -248,11 +248,15 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     }
 
     private static String sanitise(String name) {
+        // It would be more efficient to create a single pattern and replace everything once.
+        // However, I think this makes things clearer and easier to understand.
         return name.replaceAll(":", "")
                 .replaceAll("\\?", "")
                 .replaceAll("\\*", "")
                 .replaceAll("//", "")
-                .replaceAll("\\$$", "");
+                .replaceAll("\\$$", "")
+                .replaceAll("=", "")
+                .replaceAll(",", "");
     }
 
     private static class ClientQuotaGauge extends Gauge<Double> {
