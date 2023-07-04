@@ -309,7 +309,7 @@ class StaticQuotaCallbackTest {
 
         //Then
         assertThat(metricName.getGroup()).isEqualTo("group");
-        assertNameComponentIsValid(metricName.getMBeanName());
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
     }
 
     @ParameterizedTest(name = "{0}")
@@ -322,7 +322,7 @@ class StaticQuotaCallbackTest {
 
         //Then
         assertThat(metricName.getType()).isEqualTo("VolumeSource");
-        assertNameComponentIsValid(metricName.getMBeanName());
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
     }
 
     @ParameterizedTest(name = "{0}")
@@ -335,7 +335,7 @@ class StaticQuotaCallbackTest {
 
         //Then
         assertThat(metricName.getType()).isEqualTo("VolumeSource");
-        assertNameComponentIsValid(metricName.getMBeanName());
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
     }
 
     @ParameterizedTest(name = "{0}")
@@ -348,7 +348,7 @@ class StaticQuotaCallbackTest {
 
         //Then
         assertThat(metricName.getGroup()).isEqualTo("group");
-        assertNameComponentIsValid(metricName.getMBeanName());
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
     }
 
     @ParameterizedTest(name = "{0}")
@@ -361,7 +361,7 @@ class StaticQuotaCallbackTest {
 
         //Then
         assertThat(metricName.getType()).isEqualTo("VolumeSource");
-        assertNameComponentIsValid(metricName.getMBeanName());
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
     }
 
     @ParameterizedTest(name = "{0}")
@@ -374,10 +374,37 @@ class StaticQuotaCallbackTest {
 
         //Then
         assertThat(metricName.getType()).isEqualTo("VolumeSource");
-        assertNameComponentIsValid(metricName.getMBeanName());
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
     }
 
-    private static void assertNameComponentIsValid(String component) {
-        assertThat(component).doesNotContain("$$", "//", "*", "?");
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
+    void shouldSanitiseTagValues(String name, String illegalPattern) {
+        //Given
+        final LinkedHashMap<String, String> tags = new LinkedHashMap<>();
+        tags.put("key1", "value" + illegalPattern);
+        tags.put("key2", "value2");
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource" + illegalPattern, "group", tags);
+
+        //Then
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName(), tags.size());
+    }
+
+    private static void assertMetricNameIsValid(String illegalPattern, String mBeanName) {
+        assertMetricNameIsValid(illegalPattern, mBeanName, 0);
+    }
+    private static void assertMetricNameIsValid(String illegalPattern, String mBeanName, int tagCount) {
+        String domain = mBeanName.substring(0, mBeanName.indexOf(":"));
+        String keyProperties = mBeanName.substring(mBeanName.indexOf(":") + 1);
+        assertThat(domain).doesNotContain(illegalPattern);
+        if (illegalPattern.equals(",")) {
+            assertThat(keyProperties.split(illegalPattern)).hasSize(2 + tagCount);
+        } else if (illegalPattern.equals("=")) {
+            assertThat(keyProperties.split("=")).hasSize(3 + tagCount);
+        } else {
+            assertThat(keyProperties).doesNotContain(illegalPattern);
+        }
     }
 }
