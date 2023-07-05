@@ -55,6 +55,25 @@ The plugin currently provides the following metrics:
 * `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Fetch` shows the currently configured fetch quota
 * `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Request` shows the currently configured request quota
 
+### Additional metrics for cluster wide monitoring
+
+| Name                          | Metric Type | Meaning                                                                        | Type           | Tags                                          |
+|-------------------------------|-------------|--------------------------------------------------------------------------------|----------------|-----------------------------------------------|
+| ThrottleFactor                | Gauge       | The current factor applied by the plug-in [0..1]                               | ThrottleFactor | `observingBrokerId`                           |
+| FallbackThrottleFactorApplied | Counter     | The number of times the plug-in has transitioned to using the fall back factor | ThrottleFactor | `observingBrokerId`                           |
+| LimitViolated                 | Counter     | A count of the number `logDir`s which violate the configured limit             | ThrottleFactor | `observingBrokerId`                           |
+| ActiveBrokers                 | Gauge       | The current number of brokers returned by the describeCluster rpc              | VolumeSource   | `observingBrokerId`                           |
+| ActiveLogDirs                 | Gauge       | The number of logDirs returned by the describeLogDirs RPC                      | VolumeSource   | `observingBrokerId`                           | 
+| AvailableBytes                | Gauge       | The number of available bytes returned by the describeLogDirs RPC              | VolumeSource   | `[observingBrokerId, remoteBrokerId, logDir]` |
+| ConsumedBytes                 | Gauge       | The number of consumed bytes returned by the describeLogDirs RPC               | VolumeSource   | `[observingBrokerId, remoteBrokerId, logDir]` |
+
+### Tag definitions
+| Tag               | Definition                                                             |
+|-------------------|------------------------------------------------------------------------|
+| observingBrokerId | The BrokerId of the broker node executing the plug-in                  |
+| remoteBrokerId    | The BrokerId of the broker node hosting the logDir                     |
+| logDir            | The path to the specific logDir as returned by the describeLogDirs RPC |
+
 ## Building
 
 To build the plugin:
