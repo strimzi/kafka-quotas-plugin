@@ -47,6 +47,13 @@ class VolumeSourceTest {
 
     private static final String LOCAL_NODE_ID = "3";
     private static final String METRICS_TYPE = "VolumeSource";
+    private static final int NODE_ID = 7;
+    private static final int NODE_2_ID = NODE_ID + 1;
+    private static final String NODE_ID_STRING = String.valueOf(NODE_ID);
+    private static final String NODE_2_ID_STRING = String.valueOf(NODE_2_ID);
+    private static final String LOG_DIR_1 = "/data/Dir1";
+    private static final String LOG_DIR_2 = "/data/Dir2";
+
     private CapturingVolumeObserver capturingVolumeObserver;
     private VolumeSource volumeSource;
     @Mock
@@ -153,9 +160,8 @@ class VolumeSourceTest {
     @Test
     void shouldProduceCollectionOfVolumes() {
         //Given
-        final int nodeId = 1;
-        givenNode(nodeId);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        givenNode(NODE_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
 
         //When
         volumeSource.run();
@@ -163,15 +169,14 @@ class VolumeSourceTest {
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
         final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
-        assertThat(onlyResult.getVolumeUsages()).containsExactly(new VolumeUsage("1", "dir1", 50, 10));
+        assertThat(onlyResult.getVolumeUsages()).containsExactly(new VolumeUsage(NODE_ID_STRING, LOG_DIR_1, 50, 10));
     }
 
     @Test
     void shouldCreateConsumedBytesMetricForALogDir() {
         //Given
-        final int nodeId = 1;
-        givenNode(nodeId);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        givenNode(NODE_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
 
         //When
         volumeSource.run();
@@ -184,12 +189,11 @@ class VolumeSourceTest {
     @Test
     void shouldTrackEvolutionOfConsumedBytesMetricForALogDir() {
         //Given
-        final int nodeId = 1;
-        givenNode(nodeId);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        givenNode(NODE_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
         volumeSource.run();
 
-        givenLogDirDescription(nodeId, "dir1", 50, 20);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 20);
 
         //When
         volumeSource.run();
@@ -202,12 +206,11 @@ class VolumeSourceTest {
     @Test
     void shouldTrackEvolutionOfAvailableBytesMetricForALogDir() {
         //Given
-        final int nodeId = 1;
-        givenNode(nodeId);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        givenNode(NODE_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
         volumeSource.run();
 
-        givenLogDirDescription(nodeId, "dir1", 50, 20);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 20);
 
         //When
         volumeSource.run();
@@ -220,9 +223,8 @@ class VolumeSourceTest {
     @Test
     void shouldCreateAvailableBytesMetricForALogDir() {
         //Given
-        final int nodeId = 1;
-        givenNode(nodeId);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        givenNode(NODE_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
 
         //When
         volumeSource.run();
@@ -235,52 +237,47 @@ class VolumeSourceTest {
     @Test
     void shouldCreateConsumedBytesMetricForEachLogDir() {
         //Given
-        final int nodeId = 1;
-        final int node2Id = nodeId + 1;
-        givenNode(nodeId);
-        givenNode(node2Id);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
-        givenLogDirDescription(nodeId, "dir2", 60, 15);
-        givenLogDirDescription(node2Id, "dir3", 40, 1);
+        givenNode(NODE_ID);
+        givenNode(NODE_2_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
+        givenLogDirDescription(NODE_ID, LOG_DIR_2, 60, 15);
+        givenLogDirDescription(NODE_2_ID, "dir3", 40, 1);
 
         //When
         volumeSource.run();
 
         //Then
         final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
-        assertGaugeMetric(volumeSourceMetrics, "ConsumedBytes", buildTagMap(nodeId, "dir1"), 40L);
-        assertGaugeMetric(volumeSourceMetrics, "ConsumedBytes", buildTagMap(nodeId, "dir2"), 45L);
-        assertGaugeMetric(volumeSourceMetrics, "ConsumedBytes", buildTagMap(node2Id, "dir3"), 39L);
+        assertGaugeMetric(volumeSourceMetrics, "ConsumedBytes", buildTagMap(NODE_ID, LOG_DIR_1), 40L);
+        assertGaugeMetric(volumeSourceMetrics, "ConsumedBytes", buildTagMap(NODE_ID, LOG_DIR_2), 45L);
+        assertGaugeMetric(volumeSourceMetrics, "ConsumedBytes", buildTagMap(NODE_2_ID, "dir3"), 39L);
     }
 
     @Test
     void shouldCreateAvailableBytesMetricForEachLogDir() {
         //Given
-        final int nodeId = 5;
-        final int node2Id = nodeId + 1;
-        givenNode(nodeId);
-        givenNode(node2Id);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
-        givenLogDirDescription(nodeId, "dir2", 60, 15);
-        givenLogDirDescription(node2Id, "dir3", 40, 1);
+        givenNode(NODE_ID);
+        givenNode(NODE_2_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
+        givenLogDirDescription(NODE_ID, LOG_DIR_2, 60, 15);
+        givenLogDirDescription(NODE_2_ID, "dir3", 40, 1);
 
         //When
         volumeSource.run();
 
         //Then
         final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
-        assertGaugeMetric(volumeSourceMetrics, "AvailableBytes", buildTagMap(nodeId, "dir1"), 10L);
-        assertGaugeMetric(volumeSourceMetrics, "AvailableBytes", buildTagMap(nodeId, "dir2"), 15L);
-        assertGaugeMetric(volumeSourceMetrics, "AvailableBytes", buildTagMap(node2Id, "dir3"), 1L);
+        assertGaugeMetric(volumeSourceMetrics, "AvailableBytes", buildTagMap(NODE_ID, LOG_DIR_1), 10L);
+        assertGaugeMetric(volumeSourceMetrics, "AvailableBytes", buildTagMap(NODE_ID, LOG_DIR_2), 15L);
+        assertGaugeMetric(volumeSourceMetrics, "AvailableBytes", buildTagMap(NODE_2_ID, "dir3"), 1L);
     }
 
     @Test
     void shouldProduceMultipleVolumesForASingleBrokerIfItHasMultipleLogDirs() {
         //Given
-        final int nodeId = 1;
-        givenNode(nodeId);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
-        givenLogDirDescription(nodeId, "dir2", 30, 5);
+        givenNode(NODE_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
+        givenLogDirDescription(NODE_ID, LOG_DIR_2, 30, 5);
 
         //When
         volumeSource.run();
@@ -288,21 +285,19 @@ class VolumeSourceTest {
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
         final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
-        VolumeUsage expected1 = new VolumeUsage("1", "dir1", 50, 10);
-        VolumeUsage expected2 = new VolumeUsage("1", "dir2", 30, 5);
+        VolumeUsage expected1 = new VolumeUsage(NODE_ID_STRING, LOG_DIR_1, 50, 10);
+        VolumeUsage expected2 = new VolumeUsage(NODE_ID_STRING, LOG_DIR_2, 30, 5);
         assertThat(onlyResult.getVolumeUsages()).containsExactlyInAnyOrder(expected1, expected2);
     }
 
     @Test
     void shouldProduceMultipleVolumesForMultipleBrokers() {
         //Given
-        final int nodeId = 1;
-        givenNode(nodeId);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
+        givenNode(NODE_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
 
-        int nodeId2 = 2;
-        givenNode(nodeId2);
-        givenLogDirDescription(nodeId2, "dir1", 30, 5);
+        givenNode(NODE_2_ID);
+        givenLogDirDescription(NODE_2_ID, LOG_DIR_1, 30, 5);
 
         //When
         volumeSource.run();
@@ -310,21 +305,19 @@ class VolumeSourceTest {
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
         final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
-        VolumeUsage expected1 = new VolumeUsage("1", "dir1", 50, 10);
-        VolumeUsage expected2 = new VolumeUsage("2", "dir1", 30, 5);
+        VolumeUsage expected1 = new VolumeUsage(NODE_ID_STRING, LOG_DIR_1, 50, 10);
+        VolumeUsage expected2 = new VolumeUsage(NODE_2_ID_STRING, LOG_DIR_1, 30, 5);
         assertThat(onlyResult.getVolumeUsages()).containsExactlyInAnyOrder(expected1, expected2);
     }
 
     @Test
     void shouldFilterVolumesWithoutAvailableBytes() {
         //Given
-        final int nodeId = 1;
-        givenNode(nodeId);
-        givenLogDirDescription(nodeId, "dir1", -1L, -1L);
+        givenNode(NODE_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, -1L, -1L);
 
-        int nodeId2 = 2;
-        givenNode(nodeId2);
-        givenLogDirDescription(nodeId2, "dir1", 30, 5);
+        givenNode(NODE_2_ID);
+        givenLogDirDescription(NODE_2_ID, LOG_DIR_1, 30, 5);
 
         //When
         volumeSource.run();
@@ -332,7 +325,7 @@ class VolumeSourceTest {
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
         final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
-        VolumeUsage expected2 = new VolumeUsage("2", "dir1", 30, 5);
+        VolumeUsage expected2 = new VolumeUsage(NODE_2_ID_STRING, LOG_DIR_1, 30, 5);
         assertThat(onlyResult.getVolumeUsages()).containsExactlyInAnyOrder(expected2);
     }
 
@@ -353,13 +346,11 @@ class VolumeSourceTest {
     @Test
     void shouldCountEachActiveBrokerInDescribeClusterResponse() {
         //Given
-        final int nodeId = 1;
-        final int node2Id = nodeId + 1;
-        givenNode(nodeId);
-        givenNode(node2Id);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
-        givenLogDirDescription(nodeId, "dir2", 60, 15);
-        givenLogDirDescription(node2Id, "dir3", 40, 1);
+        givenNode(NODE_ID);
+        givenNode(NODE_2_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
+        givenLogDirDescription(NODE_ID, LOG_DIR_2, 60, 15);
+        givenLogDirDescription(NODE_2_ID, "dir3", 40, 1);
 
         //When
         volumeSource.run();
@@ -372,13 +363,11 @@ class VolumeSourceTest {
     @Test
     void shouldCountEachActiveLogDirInDescribeLogDirsResponse() {
         //Given
-        final int nodeId = 1;
-        final int node2Id = nodeId + 1;
-        givenNode(nodeId);
-        givenNode(node2Id);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
-        givenLogDirDescription(nodeId, "dir2", 60, 15);
-        givenLogDirDescription(node2Id, "dir3", 40, 1);
+        givenNode(NODE_ID);
+        givenNode(NODE_2_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
+        givenLogDirDescription(NODE_ID, LOG_DIR_2, 60, 15);
+        givenLogDirDescription(NODE_2_ID, "dir3", 40, 1);
 
         //When
         volumeSource.run();
@@ -391,13 +380,11 @@ class VolumeSourceTest {
     @Test
     void shouldCountEachValidLogDirInDescribeLogDirsResponse() {
         //Given
-        final int nodeId = 1;
-        final int node2Id = nodeId + 1;
-        givenNode(nodeId);
-        givenNode(node2Id);
-        givenLogDirDescription(nodeId, "dir1", 50, 10);
-        givenLogDirDescription(nodeId, "dir2", -1, -1);
-        givenLogDirDescription(node2Id, "dir3", 40, 1);
+        givenNode(NODE_ID);
+        givenNode(NODE_2_ID);
+        givenLogDirDescription(NODE_ID, LOG_DIR_1, 50, 10);
+        givenLogDirDescription(NODE_ID, LOG_DIR_2, -1, -1);
+        givenLogDirDescription(NODE_2_ID, "dir3", 40, 1);
 
         //When
         volumeSource.run();
@@ -406,6 +393,7 @@ class VolumeSourceTest {
         final SortedMap<MetricName, Metric> volumeSourceMetrics = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
         assertGaugeMetric(volumeSourceMetrics, "ActiveLogDirs", buildBasicTagMap(), 2L);
     }
+
     private static LinkedHashMap<String, String> buildTagMap(int remoteNodeId, String logDir) {
         final LinkedHashMap<String, String> tags = buildBasicTagMap();
         tags.put(VolumeSource.REMOTE_BROKER_TAG, String.valueOf(remoteNodeId));
@@ -431,7 +419,6 @@ class VolumeSourceTest {
             return actualResults;
         }
     }
-
 
     private void givenNode(int nodeId) {
         final Node singleNode = new Node(nodeId, "broker1", 9092);
