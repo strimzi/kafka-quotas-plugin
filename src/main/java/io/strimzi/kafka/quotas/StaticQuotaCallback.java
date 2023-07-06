@@ -247,16 +247,19 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         return new MetricName(sanitisedGroup, sanitisedType, sanitisedName, SCOPE, mBeanName);
     }
 
+    /**
+     * MetricNames are translated to mbean names which need to comply with the @see javax.management.ObjectName rules.
+     * Unfortunately the constructors we use from Yammer don't validate the metric names, so we do it ourselves.
+     *
+     * @param name value to be sanitised
+     * @return the value with all illegal characters removed
+     */
     private static String sanitise(String name) {
         // It would be more efficient to create a single pattern and replace everything once.
         // However, I think this makes things clearer and easier to understand.
-        return name.replaceAll(":", "")
-                .replaceAll("\\?", "")
-                .replaceAll("\\*", "")
-                .replaceAll("//", "")
-                .replaceAll("\\$$", "")
-                .replaceAll("=", "")
-                .replaceAll(",", "");
+        return name.replaceAll("[:?*=,]", "")
+                .replaceAll("//", "") // Double slashes are reserved as a protocol specifier
+                .replaceAll("\\$$", ""); // $ is only illegal as a trailing character as it is used to denote inner classes.
     }
 
     private static class ClientQuotaGauge extends Gauge<Double> {
