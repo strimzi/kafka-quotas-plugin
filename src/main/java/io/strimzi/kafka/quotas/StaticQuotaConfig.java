@@ -164,7 +164,7 @@ public class StaticQuotaConfig extends AbstractConfig {
      * @return the specified broker id.
      */
     public String getBrokerId() {
-        return this.getString("broker.id");
+        return this.originalsStrings().get("broker.id");
     }
 
     static class KafkaClientConfig extends AbstractConfig {

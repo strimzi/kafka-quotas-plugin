@@ -49,7 +49,9 @@ import static org.mockito.Mockito.when;
 class StaticQuotaCallbackTest {
 
     private static final int STORAGE_CHECK_INTERVAL = 20;
-    private static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, String.valueOf(STORAGE_CHECK_INTERVAL), StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", StaticQuotaConfig.AVAILABLE_BYTES_PROP, "2");
+    private static final String BROKER_ID_PROPERTY = "broker.id";
+    private static final String BROKER_ID = "1";
+    private static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, String.valueOf(STORAGE_CHECK_INTERVAL), StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", StaticQuotaConfig.AVAILABLE_BYTES_PROP, "2", BROKER_ID_PROPERTY, BROKER_ID);
     private static final long VOLUME_CAPACITY = 50;
     public static final long THROTTLE_FACTOR_EXPIRY_INTERVAL = 10L;
     private static final String METRICS_TYPE = "StaticQuotaCallback";
@@ -83,7 +85,7 @@ class StaticQuotaCallbackTest {
     @Test
     void quotaDefaults() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
-        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
+        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", BROKER_ID_PROPERTY, BROKER_ID));
 
         double produceQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(Double.MAX_VALUE, produceQuotaLimit);
@@ -96,7 +98,8 @@ class StaticQuotaCallbackTest {
     void produceQuota() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
         target.configure(Map.of(StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY));
 
         double quotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(1024, quotaLimit);
@@ -113,7 +116,8 @@ class StaticQuotaCallbackTest {
         quotaCallback.configure(Map.of(
                 StaticQuotaConfig.AVAILABLE_BYTES_PROP, "15",
                 StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "10",
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY
         ));
 
         //When
@@ -135,7 +139,8 @@ class StaticQuotaCallbackTest {
         quotaCallback.configure(Map.of(
                 StaticQuotaConfig.AVAILABLE_RATIO_PROP, "0.5",
                 StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "10",
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY
         ));
 
         //When
@@ -159,7 +164,8 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.AVAILABLE_RATIO_PROP, "0.5",
                 StaticQuotaConfig.AVAILABLE_BYTES_PROP, "1",
                 StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "10",
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY
         )));
     }
 
@@ -211,7 +217,7 @@ class StaticQuotaCallbackTest {
         StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
 
         //When
-        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
+        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", BROKER_ID_PROPERTY, BROKER_ID));
 
         //Then
         verify(scheduledExecutorService, times(0)).scheduleWithFixedDelay(any(), anyLong(), anyLong(), any(TimeUnit.class));
