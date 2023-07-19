@@ -248,7 +248,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     }
 
     /**
-     * MetricNames are translated to mbean names which need to comply with the @see javax.management.ObjectName rules.
+     * MetricNames are translated to mbean names which need to comply with the @link{<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.management/javax/management/ObjectName.html">javax.management.ObjectName</a>} rules.
      * Unfortunately the constructors we use from Yammer don't validate the metric names, so we do it ourselves.
      *
      * @param name value to be sanitised
