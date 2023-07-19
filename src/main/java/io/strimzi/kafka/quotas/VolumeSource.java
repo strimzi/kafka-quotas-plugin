@@ -271,6 +271,11 @@ public class VolumeSource implements Runnable {
         }
     }
 
+    /**
+     * Arguably using AtomicLong here is over kill (we just need volatile semantics) however it makes sense to
+     * standardise on a single gauge type, and we need to use AtomicLongs for the available and consumed bytes gauges
+     * as they are stored in maps (to ensure the correct tagging of the metrics)
+     */
     private static class AtomicLongGauge extends Gauge<Long> {
 
         private final AtomicLong atomicLong;
