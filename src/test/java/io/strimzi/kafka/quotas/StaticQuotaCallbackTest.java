@@ -4,16 +4,14 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.SortedMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.Metric;
 import com.yammer.metrics.core.MetricName;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
@@ -22,11 +20,16 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static io.strimzi.kafka.quotas.MetricUtils.METRICS_SCOPE;
+import static io.strimzi.kafka.quotas.MetricUtils.getMetricGroup;
+import static io.strimzi.kafka.quotas.MetricUtils.resetMetrics;
 import static io.strimzi.kafka.quotas.VolumeUsageResult.success;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.offset;
@@ -46,9 +49,12 @@ import static org.mockito.Mockito.when;
 class StaticQuotaCallbackTest {
 
     private static final int STORAGE_CHECK_INTERVAL = 20;
-    private static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, STORAGE_CHECK_INTERVAL, StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", StaticQuotaConfig.AVAILABLE_BYTES_PROP, "2");
+    private static final String BROKER_ID_PROPERTY = "broker.id";
+    private static final String BROKER_ID = "1";
+    private static final Map<String, Object> MINIMUM_EXECUTABLE_CONFIG = Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, String.valueOf(STORAGE_CHECK_INTERVAL), StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", StaticQuotaConfig.AVAILABLE_BYTES_PROP, "2", BROKER_ID_PROPERTY, BROKER_ID);
     private static final long VOLUME_CAPACITY = 50;
     public static final long THROTTLE_FACTOR_EXPIRY_INTERVAL = 10L;
+    private static final String METRICS_TYPE = "StaticQuotaCallback";
 
     @Mock(lenient = true)
     VolumeSourceBuilder volumeSourceBuilder;
@@ -66,18 +72,20 @@ class StaticQuotaCallbackTest {
         target = new StaticQuotaCallback();
         when(volumeSourceBuilder.withConfig(any())).thenReturn(volumeSourceBuilder);
         when(volumeSourceBuilder.withVolumeObserver(any())).thenReturn(volumeSourceBuilder);
+        when(volumeSourceBuilder.withDefaultTags(any())).thenReturn(volumeSourceBuilder);
         when(volumeSourceBuilder.build()).thenReturn(Mockito.mock(VolumeSource.class));
     }
 
     @AfterEach
     void tearDown() {
         target.close();
+        resetMetrics(METRICS_SCOPE, METRICS_TYPE);
     }
 
     @Test
     void quotaDefaults() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
-        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
+        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", BROKER_ID_PROPERTY, BROKER_ID));
 
         double produceQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(Double.MAX_VALUE, produceQuotaLimit);
@@ -90,7 +98,8 @@ class StaticQuotaCallbackTest {
     void produceQuota() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
         target.configure(Map.of(StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY));
 
         double quotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(1024, quotaLimit);
@@ -105,9 +114,10 @@ class StaticQuotaCallbackTest {
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
 
         quotaCallback.configure(Map.of(
-                StaticQuotaConfig.AVAILABLE_BYTES_PROP, 15L,
-                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10,
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
+                StaticQuotaConfig.AVAILABLE_BYTES_PROP, "15",
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "10",
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY
         ));
 
         //When
@@ -127,9 +137,10 @@ class StaticQuotaCallbackTest {
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
 
         quotaCallback.configure(Map.of(
-                StaticQuotaConfig.AVAILABLE_RATIO_PROP, 0.5,
-                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10,
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
+                StaticQuotaConfig.AVAILABLE_RATIO_PROP, "0.5",
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "10",
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY
         ));
 
         //When
@@ -149,14 +160,13 @@ class StaticQuotaCallbackTest {
         StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
 
         //Then
-        assertThrows(IllegalStateException.class, () -> {
-            quotaCallback.configure(Map.of(
-                    StaticQuotaConfig.AVAILABLE_RATIO_PROP, 0.5,
-                    StaticQuotaConfig.AVAILABLE_BYTES_PROP, 1,
-                    StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 10,
-                    StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
-            ));
-        });
+        assertThrows(IllegalStateException.class, () -> quotaCallback.configure(Map.of(
+                StaticQuotaConfig.AVAILABLE_RATIO_PROP, "0.5",
+                StaticQuotaConfig.AVAILABLE_BYTES_PROP, "1",
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "10",
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY
+        )));
     }
 
     @Test
@@ -207,7 +217,7 @@ class StaticQuotaCallbackTest {
         StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
 
         //When
-        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
+        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", BROKER_ID_PROPERTY, BROKER_ID));
 
         //Then
         verify(scheduledExecutorService, times(0)).scheduleWithFixedDelay(any(), anyLong(), anyLong(), any(TimeUnit.class));
@@ -283,11 +293,11 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
         ));
 
-        SortedMap<MetricName, Metric> group = getMetricGroup("io.strimzi.kafka.quotas.StaticQuotaCallback", "StaticQuotaCallback");
+        SortedMap<MetricName, Metric> group = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
 
-        assertGaugeMetric(group, "Produce", 15.0);
-        assertGaugeMetric(group, "Fetch", 16.0);
-        assertGaugeMetric(group, "Request", 17.0);
+        MetricUtils.assertGaugeMetric(group, "Produce", 15.0);
+        MetricUtils.assertGaugeMetric(group, "Fetch", 16.0);
+        MetricUtils.assertGaugeMetric(group, "Request", 17.0);
 
         // the mbean name is part of the public api
         MetricName name = group.firstKey();
@@ -295,21 +305,112 @@ class StaticQuotaCallbackTest {
         assertEquals(expectedMbeanName, name.getMBeanName(), "unexpected mbean name");
     }
 
-    private SortedMap<MetricName, Metric> getMetricGroup(String p, String t) {
-        SortedMap<String, SortedMap<MetricName, Metric>> storageMetrics = Metrics.defaultRegistry().groupedMetrics((name, metric) -> p.equals(name.getScope()) && t.equals(name.getType()));
-        assertEquals(1, storageMetrics.size(), "unexpected number of metrics in group");
-        return storageMetrics.entrySet().iterator().next().getValue();
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
+    void shouldProduceValidMbeanObjectNamesWhenGroupContains(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource", "group" + illegalPattern);
+
+        //Then
+        assertThat(metricName.getGroup()).isEqualTo("group");
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
     }
 
-    private <T> void assertGaugeMetric(SortedMap<MetricName, Metric> metrics, String name, T expected) {
-        Optional<Gauge<T>> desired = findGaugeMetric(metrics, name);
-        assertTrue(desired.isPresent(), String.format("metric with name %s not found in %s", name, metrics));
-        Gauge<T> gauge = desired.get();
-        assertEquals(expected, gauge.value(), String.format("metric %s has unexpected value", name));
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
+    void shouldProduceValidMbeanObjectNamesWhenTypeContains(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource" + illegalPattern, "group");
+
+        //Then
+        assertThat(metricName.getType()).isEqualTo("VolumeSource");
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
     }
 
-    @SuppressWarnings("unchecked")
-    private <T> Optional<Gauge<T>> findGaugeMetric(SortedMap<MetricName, Metric> metrics, String name) {
-        return metrics.entrySet().stream().filter(e -> name.equals(e.getKey().getName())).map(e -> (Gauge<T>) e.getValue()).findFirst();
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
+    void shouldProduceValidMbeanObjectNamesWhenTypeClassContains(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource" + illegalPattern, "group");
+
+        //Then
+        assertThat(metricName.getType()).isEqualTo("VolumeSource");
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
+    void shouldProduceValidMbeanObjectNamesWhenGroupContainsWithTags(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource", "group" + illegalPattern, new LinkedHashMap<>());
+
+        //Then
+        assertThat(metricName.getGroup()).isEqualTo("group");
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
+    void shouldProduceValidMbeanObjectNamesWhenTypeContainsWithTags(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource" + illegalPattern, "group", new LinkedHashMap<>());
+
+        //Then
+        assertThat(metricName.getType()).isEqualTo("VolumeSource");
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
+    void shouldProduceValidMbeanObjectNamesWhenTypeClassContainsWithTags(String name, String illegalPattern) {
+        //Given
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource" + illegalPattern, "group", new LinkedHashMap<>());
+
+        //Then
+        assertThat(metricName.getType()).isEqualTo("VolumeSource");
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(value = {"colon,:", "double forward slashes,//", "asterisk,*", "question mark,?",  "comma,','", "equals,="})
+    void shouldSanitiseTagValues(String name, String illegalPattern) {
+        //Given
+        final LinkedHashMap<String, String> tags = new LinkedHashMap<>();
+        tags.put("key1", "value" + illegalPattern);
+        tags.put("key2", "value2");
+
+        //When
+        final MetricName metricName = StaticQuotaCallback.metricName("class", "VolumeSource" + illegalPattern, "group", tags);
+
+        //Then
+        assertMetricNameIsValid(illegalPattern, metricName.getMBeanName(), tags.size());
+    }
+
+    private static void assertMetricNameIsValid(String illegalPattern, String mBeanName) {
+        assertMetricNameIsValid(illegalPattern, mBeanName, 0);
+    }
+    private static void assertMetricNameIsValid(String illegalPattern, String mBeanName, int tagCount) {
+        String domain = mBeanName.substring(0, mBeanName.indexOf(":"));
+        String keyProperties = mBeanName.substring(mBeanName.indexOf(":") + 1);
+        assertThat(domain).doesNotContain(illegalPattern);
+        if (illegalPattern.equals(",")) {
+            assertThat(keyProperties.split(illegalPattern)).hasSize(2 + tagCount);
+        } else if (illegalPattern.equals("=")) {
+            assertThat(keyProperties.split("=")).hasSize(3 + tagCount);
+        } else {
+            assertThat(keyProperties).doesNotContain(illegalPattern);
+        }
     }
 }

@@ -7,6 +7,7 @@ package io.strimzi.kafka.quotas;
 import java.time.Clock;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -15,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Gauge;
@@ -53,6 +55,12 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final static String SCOPE = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
     private final ScheduledExecutorService backgroundScheduler;
+
+    /**
+     * Tag used for metrics to identify the broker which is recording the observation.
+     */
+    public static final String HOST_BROKER_TAG = "observingBrokerId";
+
 
     /**
      * Default constructor for production use.
@@ -139,6 +147,9 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         quotaMap = config.getQuotaMap();
         long storageCheckInterval = config.getStorageCheckInterval();
         if (storageCheckInterval > 0L) {
+            LinkedHashMap<String, String> defaultTags = new LinkedHashMap<>();
+            defaultTags.put(HOST_BROKER_TAG, config.getBrokerId());
+
             final Optional<Long> availableBytesLimitConfig = config.getAvailableBytesLimit();
             final Optional<Double> availableRatioLimit = config.getAvailableRatioLimit();
             if (availableBytesLimitConfig.isPresent() && availableRatioLimit.isPresent()) {
@@ -156,10 +167,10 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
                 throw new IllegalStateException("storageCheckInterval > 0 but no limit type configured");
             }
             FixedDurationExpiryPolicy expiryPolicy = new FixedDurationExpiryPolicy(Clock.systemUTC(), config.getThrottleFactorValidityDuration());
-            final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE), expiryPolicy, config.getFallbackThrottleFactor());
+            final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE), expiryPolicy, config.getFallbackThrottleFactor(), defaultTags);
             throttleFactorSource = factorNotifier;
 
-            Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(factorNotifier).build();
+            Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(factorNotifier).withDefaultTags(defaultTags).build();
             backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckInterval, TimeUnit.SECONDS);
             backgroundScheduler.scheduleWithFixedDelay(factorNotifier::checkThrottleFactorValidity, 0, 10, TimeUnit.SECONDS);
             log.info("Configured quota callback with {}. Storage check interval: {}s", quotaMap, storageCheckInterval);
@@ -185,15 +196,70 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         }
     }
 
+    static MetricName metricName(Class<?> clazz, String name, LinkedHashMap<String, String> tags) {
+        String group = clazz.getPackageName();
+        String type = clazz.getSimpleName();
+        return metricName(name, type, group, tags);
+    }
+
     static MetricName metricName(Class<?> clazz, String name) {
         String group = clazz.getPackageName();
         String type = clazz.getSimpleName();
         return metricName(name, type, group);
     }
 
-    static MetricName metricName(String name, String type, String group) {
-        String mBeanName = String.format("%s:type=%s,name=%s", group, type, name);
-        return new MetricName(group, type, name, SCOPE, mBeanName);
+    /**
+     * Generate a Yammer metric name
+     *
+     * @param name  the name of the Metric.
+     * @param type  the type to which the Metric belongs.
+     * @param group the group to which the Metric belongs type
+     * @return the MetricName object derived from the arguments.
+     */
+    public static MetricName metricName(String name, String type, String group) {
+        final String sanitisedGroup = sanitise(group);
+        final String sanitisedType = sanitise(type);
+        final String sanitisedName = sanitise(name);
+        String mBeanName = String.format("%s:type=%s,name=%s", sanitisedGroup, sanitisedType, sanitisedName);
+        return new MetricName(sanitisedGroup, sanitisedType, sanitisedName, SCOPE, mBeanName);
+    }
+
+    /**
+     * Generate a Yammer metric name
+     *
+     * @param name  the name of the Metric.
+     * @param type  the type to which the Metric belongs.
+     * @param group the group to which the Metric belongs type
+     * @param tags  an ordered set of key value mappings
+     * @return the MetricName object derived from the arguments.
+     */
+    public static MetricName metricName(String name, String type, String group, LinkedHashMap<String, String> tags) {
+        final String tagValues = tags.entrySet().stream().map(entry -> String.format("%s=%s", sanitise(entry.getKey()), sanitise(entry.getValue()))).collect(Collectors.joining(","));
+        String mBeanName;
+        final String sanitisedGroup = sanitise(group);
+        final String sanitisedType = sanitise(type);
+        final String sanitisedName = sanitise(name);
+        if (!tagValues.isBlank()) {
+            mBeanName = String.format("%s:type=%s,name=%s,%s", sanitisedGroup, sanitisedType, sanitisedName, tagValues);
+        } else {
+            mBeanName = String.format("%s:type=%s,name=%s", sanitisedGroup, sanitisedType, sanitisedName);
+        }
+        return new MetricName(sanitisedGroup, sanitisedType, sanitisedName, SCOPE, mBeanName);
+    }
+
+    /**
+     * MetricNames are translated to mbean names which need to comply with the @link{<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.management/javax/management/ObjectName.html">javax.management.ObjectName</a>} rules.
+     * Unfortunately the constructors we use from Yammer don't validate the metric names, so we do it ourselves.
+     *
+     * @param name value to be sanitised
+     * @return the value with all illegal characters removed
+     */
+    private static String sanitise(String name) {
+        // It would be more efficient to create a single pattern and replace everything once.
+        // However, I think this makes things clearer and easier to understand.
+        return name.replaceAll("[:?*=,]", "")
+                .replaceAll("//", "") // Double slashes are reserved as a protocol specifier
+                .replaceAll("\\$$", ""); // $ is only illegal as a trailing character as it is used to denote inner classes.
     }
 
     private static class ClientQuotaGauge extends Gauge<Double> {

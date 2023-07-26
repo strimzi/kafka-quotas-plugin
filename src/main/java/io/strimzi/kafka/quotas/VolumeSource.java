@@ -6,17 +6,24 @@
 package io.strimzi.kafka.quotas;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Gauge;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus;
 import org.apache.kafka.clients.admin.Admin;
@@ -26,6 +33,7 @@ import org.apache.kafka.common.Node;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static io.strimzi.kafka.quotas.StaticQuotaCallback.metricName;
 import static io.strimzi.kafka.quotas.VolumeUsageResult.failure;
 import static io.strimzi.kafka.quotas.VolumeUsageResult.success;
 import static java.util.stream.Collectors.toSet;
@@ -39,10 +47,28 @@ import static java.util.stream.Collectors.toSet;
  */
 public class VolumeSource implements Runnable {
 
+    /**
+     * Tag used for metrics to identify the borker which generated the observation.
+     */
+    public static final String REMOTE_BROKER_TAG = "remoteBrokerId";
+
+    /**
+     * Tag used for metrics to identify the logDir included in the observation.
+     */
+    public static final String LOG_DIR_TAG = "logDir";
+
     private final VolumeObserver volumeObserver;
     private final Admin admin;
     private final int timeout;
     private final TimeUnit timeoutUnit;
+    private final LinkedHashMap<String, String> defaultTags;
+
+    private final AtomicLong activeBrokerCount = new AtomicLong(0L);
+
+    private final AtomicLong activeLogDirsCount = new AtomicLong(0L);
+
+    private final Map<String, Map<String, AtomicLong>> consumedBytesGauges = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, AtomicLong>> availableBytesGauges = new ConcurrentHashMap<>();
 
     private static final Logger log = LoggerFactory.getLogger(VolumeSource.class);
 
@@ -53,13 +79,17 @@ public class VolumeSource implements Runnable {
      * @param volumeObserver the listener to be notified of the volume usage
      * @param timeout        how long should we wait for cluster information
      * @param timeoutUnit    What unit is the timeout configured in
+     * @param defaultTags    The minimum collection of tags to add each metric.
      */
-    @SuppressFBWarnings("EI_EXPOSE_REP2") //Injecting the dependency is the right move as it can be shared
-    public VolumeSource(Admin admin, VolumeObserver volumeObserver, int timeout, TimeUnit timeoutUnit) {
+    @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Injecting the dependency is the right move as it can be shared")
+    public VolumeSource(Admin admin, VolumeObserver volumeObserver, int timeout, TimeUnit timeoutUnit, LinkedHashMap<String, String> defaultTags) {
         this.volumeObserver = volumeObserver;
         this.admin = admin;
         this.timeout = timeout;
         this.timeoutUnit = timeoutUnit;
+        this.defaultTags = defaultTags;
+        Metrics.newGauge(metricName("ActiveBrokers", "VolumeSource", "io.strimzi.kafka.quotas", defaultTags), new AtomicLongGauge(activeBrokerCount));
+        Metrics.newGauge(metricName("ActiveLogDirs", "VolumeSource", "io.strimzi.kafka.quotas", defaultTags), new AtomicLongGauge(activeLogDirsCount));
     }
 
     @Override
@@ -118,12 +148,17 @@ public class VolumeSource implements Runnable {
 
     private CompletionStage<VolumeUsageResult> onDescribeClusterSuccess(Collection<Node> nodes) {
         final Set<Integer> allBrokerIds = nodes.stream().map(Node::id).collect(toSet());
+        activeBrokerCount.set(allBrokerIds.size());
+        allBrokerIds.forEach(brokerId -> {
+            availableBytesGauges.computeIfAbsent(String.valueOf(brokerId), key -> new ConcurrentHashMap<>());
+            consumedBytesGauges.computeIfAbsent(String.valueOf(brokerId), key -> new ConcurrentHashMap<>());
+        });
         log.debug("Attempting to describe logDirs");
         return toResultStage(admin.describeLogDirs(allBrokerIds).allDescriptions())
-                .thenApply(VolumeSource::onDescribeLogDirComplete);
+                .thenApply(this::onDescribeLogDirComplete);
     }
 
-    private static VolumeUsageResult onDescribeLogDirComplete(Result<Map<Integer, Map<String, LogDirDescription>>> logDirResult) {
+    private VolumeUsageResult onDescribeLogDirComplete(Result<Map<Integer, Map<String, LogDirDescription>>> logDirResult) {
         if (logDirResult.isFailure()) {
             return failure(VolumeSourceObservationStatus.DESCRIBE_LOG_DIR_ERROR, logDirResult.getThrowable());
         } else {
@@ -131,15 +166,42 @@ public class VolumeSource implements Runnable {
         }
     }
 
-    private static VolumeUsageResult onDescribeLogDirSuccess(Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker) {
+    private VolumeUsageResult onDescribeLogDirSuccess(Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker) {
         if (log.isDebugEnabled()) {
             log.debug("Successfully described logDirs: " + logDirsPerBroker);
         }
-        return success(logDirsPerBroker.entrySet()
+        List<VolumeUsage> volumeUsages = logDirsPerBroker.entrySet()
                 .stream()
                 .flatMap(VolumeSource::toVolumes)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toUnmodifiableList()));
+                .collect(Collectors.toUnmodifiableList());
+
+        activeLogDirsCount.set(volumeUsages.size());
+
+        volumeUsages.forEach(volumeUsage -> {
+            availableBytesGauges.get(volumeUsage.getBrokerId())
+                    .computeIfAbsent(volumeUsage.getLogDir(), buildCounter(volumeUsage, "AvailableBytes"))
+                    .set(volumeUsage.getAvailableBytes());
+            consumedBytesGauges.get(volumeUsage.getBrokerId())
+                    .computeIfAbsent(volumeUsage.getLogDir(), buildCounter(volumeUsage, "ConsumedBytes"))
+                    .set(volumeUsage.getConsumedSpace());
+        });
+        return success(volumeUsages);
+    }
+
+    private Function<String, AtomicLong> buildCounter(VolumeUsage volumeUsage, String counterName) {
+        return logDir -> {
+            AtomicLong underlying = new AtomicLong(0);
+            Metrics.newGauge(metricName(VolumeSource.class, counterName, buildTagMap(volumeUsage)), new AtomicLongGauge(underlying));
+            return underlying;
+        };
+    }
+
+    private LinkedHashMap<String, String> buildTagMap(VolumeUsage volumeUsage) {
+        final LinkedHashMap<String, String> tags = new LinkedHashMap<>(defaultTags);
+        tags.put(REMOTE_BROKER_TAG, volumeUsage.getBrokerId());
+        tags.put(LOG_DIR_TAG, volumeUsage.getLogDir());
+        return tags;
     }
 
     private static Stream<? extends VolumeUsage> toVolumes(Map.Entry<Integer, Map<String, LogDirDescription>> brokerIdToLogDirs) {
@@ -209,4 +271,22 @@ public class VolumeSource implements Runnable {
         }
     }
 
+    /**
+     * Arguably using AtomicLong here is over kill (we just need volatile semantics) however it makes sense to
+     * standardise on a single gauge type, and we need to use AtomicLongs for the available and consumed bytes gauges
+     * as they are stored in maps (to ensure the correct tagging of the metrics)
+     */
+    private static class AtomicLongGauge extends Gauge<Long> {
+
+        private final AtomicLong atomicLong;
+
+        private AtomicLongGauge(AtomicLong atomicLong) {
+            this.atomicLong = atomicLong;
+        }
+
+        @Override
+        public Long value() {
+            return atomicLong.get();
+        }
+    }
 }

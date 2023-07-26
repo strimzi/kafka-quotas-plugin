@@ -159,6 +159,13 @@ public class StaticQuotaConfig extends AbstractConfig {
         }, () -> "Should be a valid iso8601 duration string like PT5M");
     }
 
+    /**
+     * Get the broker id of the current broker.
+     * @return the specified broker id.
+     */
+    public String getBrokerId() {
+        return this.originalsStrings().get("broker.id");
+    }
 
     static class KafkaClientConfig extends AbstractConfig {
         public static final String CLIENT_ID_PREFIX_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.clientIdPrefix";
