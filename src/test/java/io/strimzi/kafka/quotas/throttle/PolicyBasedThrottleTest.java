@@ -56,35 +56,35 @@ class PolicyBasedThrottleTest {
     }
 
     @Test
-    public void testFallbackWhenFactorExpired() {
+    void testFallbackWhenFactorExpired() {
         givenFactorIsExpired();
         whenCheckForStaleFactor(policyBasedThrottle);
         thenFactorUpdatedToFallback(policyBasedThrottle);
     }
 
     @Test
-    public void testFallbackWhenFactorExpiredAndFailedVolumeUsageResult() {
+    void testFallbackWhenFactorExpiredAndFailedVolumeUsageResult() {
         givenFactorIsExpired();
         whenVolumeUsageResultFailureObserved();
         thenFactorUpdatedToFallback(policyBasedThrottle);
     }
 
     @Test
-    public void testCurrentFactorContinuesOnFailedVolumeUsageResult() {
+    void testCurrentFactorContinuesOnFailedVolumeUsageResult() {
         givenFactorIsCurrent();
         whenVolumeUsageResultFailureObserved();
         thenFactorUnchanged();
     }
 
     @Test
-    public void testCurrentFactorContinuesOnStalenessCheck() {
+    void testCurrentFactorContinuesOnStalenessCheck() {
         givenFactorIsCurrent();
         whenCheckForStaleFactor(policyBasedThrottle);
         thenFactorUnchanged();
     }
 
     @Test
-    public void testCurrentThrottleFactorValidFromUpdatedOnSuccessfulVolumeUsageResult() {
+    void testCurrentThrottleFactorValidFromUpdatedOnSuccessfulVolumeUsageResult() {
         Instant now = givenFixedTimeProgressedOneMinute();
         whenVolumeUsageResultSuccessObserved();
         thenCurrentThrottleFactorValidFrom(now);
@@ -115,7 +115,7 @@ class PolicyBasedThrottleTest {
     }
 
     @Test
-    public void shouldNotIncrementFallbackFactorApplied() {
+    void shouldNotIncrementFallbackFactorApplied() {
         //Given
         givenFactorIsCurrent();
 
@@ -129,7 +129,7 @@ class PolicyBasedThrottleTest {
     }
 
     @Test
-    public void shouldCountFallbackFactorApplied() {
+    void shouldCountFallbackFactorApplied() {
         //Given
         givenFactorIsExpired();
 
@@ -142,7 +142,7 @@ class PolicyBasedThrottleTest {
     }
 
     @Test
-    public void shouldNotCountFallbackFactorAppliedWhenFactorIsValid() {
+    void shouldNotCountFallbackFactorAppliedWhenFactorIsValid() {
         //Given
         final FixedDurationExpiryPolicy oneMinuteExpiryPolicy = new FixedDurationExpiryPolicy(clock, Duration.ofMinutes(1L));
         policyBasedThrottle = new PolicyBasedThrottle(THROTTLE_FACTOR_POLICY, runnable, clock, oneMinuteExpiryPolicy, 0.0, defaultTags);
@@ -158,7 +158,7 @@ class PolicyBasedThrottleTest {
     }
 
     @Test
-    public void shouldIncrementFallbackFactorAppliedWhenPreviousFactorExpires() {
+    void shouldIncrementFallbackFactorAppliedWhenPreviousFactorExpires() {
         //Given
         final FixedDurationExpiryPolicy thirtySecondExpiryPolicy = new FixedDurationExpiryPolicy(clock, Duration.ofSeconds(30L));
         policyBasedThrottle = new PolicyBasedThrottle(THROTTLE_FACTOR_POLICY, runnable, clock, thirtySecondExpiryPolicy, 0.0, defaultTags);
@@ -174,7 +174,7 @@ class PolicyBasedThrottleTest {
     }
 
     @Test
-    public void shouldIncrementFallbackFactorAppliedOnEachExpiry() {
+    void shouldIncrementFallbackFactorAppliedOnEachExpiry() {
         //Given
         final FixedDurationExpiryPolicy thirtySecondExpiryPolicy = new FixedDurationExpiryPolicy(clock, Duration.ofSeconds(30L));
         policyBasedThrottle = new PolicyBasedThrottle(THROTTLE_FACTOR_POLICY, runnable, clock, thirtySecondExpiryPolicy, 0.0, defaultTags);
