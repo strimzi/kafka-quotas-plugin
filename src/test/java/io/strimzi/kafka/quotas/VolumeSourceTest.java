@@ -5,6 +5,7 @@
 
 package io.strimzi.kafka.quotas;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -169,7 +170,7 @@ class VolumeSourceTest {
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
         final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
-        assertThat(onlyResult.getVolumeUsages()).containsExactly(new VolumeUsage(NODE_ID_STRING, LOG_DIR_1, 50, 10));
+        assertThat(onlyResult.getVolumeUsages()).containsExactly(new VolumeUsage(NODE_ID_STRING, LOG_DIR_1, 50, 10, Instant.now()));
     }
 
     @Test
@@ -285,8 +286,8 @@ class VolumeSourceTest {
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
         final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
-        VolumeUsage expected1 = new VolumeUsage(NODE_ID_STRING, LOG_DIR_1, 50, 10);
-        VolumeUsage expected2 = new VolumeUsage(NODE_ID_STRING, LOG_DIR_2, 30, 5);
+        VolumeUsage expected1 = new VolumeUsage(NODE_ID_STRING, LOG_DIR_1, 50, 10, Instant.now());
+        VolumeUsage expected2 = new VolumeUsage(NODE_ID_STRING, LOG_DIR_2, 30, 5, Instant.now());
         assertThat(onlyResult.getVolumeUsages()).containsExactlyInAnyOrder(expected1, expected2);
     }
 
@@ -305,8 +306,8 @@ class VolumeSourceTest {
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
         final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
-        VolumeUsage expected1 = new VolumeUsage(NODE_ID_STRING, LOG_DIR_1, 50, 10);
-        VolumeUsage expected2 = new VolumeUsage(NODE_2_ID_STRING, LOG_DIR_1, 30, 5);
+        VolumeUsage expected1 = new VolumeUsage(NODE_ID_STRING, LOG_DIR_1, 50, 10, Instant.now());
+        VolumeUsage expected2 = new VolumeUsage(NODE_2_ID_STRING, LOG_DIR_1, 30, 5, Instant.now());
         assertThat(onlyResult.getVolumeUsages()).containsExactlyInAnyOrder(expected1, expected2);
     }
 
@@ -325,7 +326,7 @@ class VolumeSourceTest {
         //Then
         final List<VolumeUsageResult> results = capturingVolumeObserver.getActualResults();
         final VolumeUsageResult onlyResult = assertVolumeUsageStatus(results, VolumeSourceObservationStatus.SUCCESS);
-        VolumeUsage expected2 = new VolumeUsage(NODE_2_ID_STRING, LOG_DIR_1, 30, 5);
+        VolumeUsage expected2 = new VolumeUsage(NODE_2_ID_STRING, LOG_DIR_1, 30, 5, Instant.now());
         assertThat(onlyResult.getVolumeUsages()).containsExactlyInAnyOrder(expected2);
     }
 

@@ -5,6 +5,7 @@
 
 package io.strimzi.kafka.quotas;
 
+import java.time.Instant;
 import java.util.Objects;
 
 /**
@@ -15,6 +16,7 @@ public class VolumeUsage {
     private final String logDir;
     private final long capacity;
     private final long availableBytes;
+    private final Instant observedAt;
 
     /**
      * Represents a snapshot of volume usage.
@@ -22,12 +24,14 @@ public class VolumeUsage {
      * @param logDir the specific logDir the volume hosts
      * @param capacity How many bytes the volume holds
      * @param availableBytes How many available bytes remain on the volume.
+     * @param observedAt When this volume usage was observed
      */
-    public VolumeUsage(String brokerId, String logDir, long capacity, long availableBytes) {
+    public VolumeUsage(String brokerId, String logDir, long capacity, long availableBytes, Instant observedAt) {
         this.brokerId = brokerId;
         this.logDir = logDir;
         this.capacity = capacity;
         this.availableBytes = availableBytes;
+        this.observedAt = observedAt;
     }
 
     /**
@@ -79,6 +83,13 @@ public class VolumeUsage {
             return 0;
         }
         return (double) availableBytes / capacity;
+    }
+
+    /**
+     * @return An instant marking when the observation was recorded by the observing broker
+     */
+    public Instant getObservedAt() {
+        return observedAt;
     }
 
     @Override

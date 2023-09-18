@@ -4,6 +4,7 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,7 @@ class StaticQuotaCallbackTest {
     VolumeSourceBuilder volumeSourceBuilder;
 
     private static VolumeUsage newVolume(long availableBytes) {
-        return new VolumeUsage("-1", "test", VOLUME_CAPACITY, availableBytes);
+        return new VolumeUsage("-1", "test", VOLUME_CAPACITY, availableBytes, Instant.now());
     }
 
     StaticQuotaCallback target;
@@ -144,7 +145,7 @@ class StaticQuotaCallbackTest {
         ));
 
         //When
-        argument.getValue().observeVolumeUsage(success(List.of(new VolumeUsage("-1", "test", 30L, 15L))));
+        argument.getValue().observeVolumeUsage(success(List.of(new VolumeUsage("-1", "test", 30L, 15L, Instant.now()))));
 
         //Then
         double quotaLimit = quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of());

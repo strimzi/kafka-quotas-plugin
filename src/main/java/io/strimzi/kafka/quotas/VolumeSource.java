@@ -5,6 +5,7 @@
 
 package io.strimzi.kafka.quotas;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -212,7 +213,8 @@ public class VolumeSource implements Runnable {
             if (logDirDescription.totalBytes().isPresent() && logDirDescription.usableBytes().isPresent()) {
                 final long totalBytes = logDirDescription.totalBytes().getAsLong();
                 final long usableBytes = logDirDescription.usableBytes().getAsLong();
-                return new VolumeUsage(String.valueOf(brokerIdToLogDirs.getKey()), logDirs.getKey(), totalBytes, usableBytes);
+                // TODO clock instead of Instant.now()
+                return new VolumeUsage(String.valueOf(brokerIdToLogDirs.getKey()), logDirs.getKey(), totalBytes, usableBytes, Instant.now());
             } else {
                 return null;
             }

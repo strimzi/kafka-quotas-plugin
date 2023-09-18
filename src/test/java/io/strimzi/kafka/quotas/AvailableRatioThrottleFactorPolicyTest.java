@@ -80,7 +80,7 @@ class AvailableRatioThrottleFactorPolicyTest {
         //When
         long capacity = 0L;
         final double actualFactor = availableBytesThrottleFactorSupplier.calculateFactor(List.of(volumeWithAvailableRatio(0.5),
-                new VolumeUsage("0", "/var/lib/data", capacity, 100)));
+                new VolumeUsage("0", "/var/lib/data", capacity, 100, Instant.now())));
 
         //Then
         assertThat(actualFactor).isCloseTo(0.0d, OFFSET);
@@ -88,6 +88,6 @@ class AvailableRatioThrottleFactorPolicyTest {
 
     private static VolumeUsage volumeWithAvailableRatio(double availableRatio) {
         int available = 100;
-        return new VolumeUsage("0", "/var/lib/data", (long) (available / availableRatio), available);
+        return new VolumeUsage("0", "/var/lib/data", (long) (available / availableRatio), available, Instant.now());
     }
 }

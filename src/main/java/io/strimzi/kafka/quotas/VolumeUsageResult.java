@@ -4,8 +4,10 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 
@@ -33,6 +35,14 @@ public class VolumeUsageResult {
      */
     public VolumeSourceObservationStatus getStatus() {
         return status;
+    }
+
+    /**
+     * The most recent value for when the log dirs were observed
+     * @return An instant marking the most recent observation of any log dir.
+     */
+    public Instant getObservedAt() {
+        return volumeUsages.stream().map(VolumeUsage::getObservedAt).max(Comparator.naturalOrder()).orElseThrow();
     }
 
     /**
