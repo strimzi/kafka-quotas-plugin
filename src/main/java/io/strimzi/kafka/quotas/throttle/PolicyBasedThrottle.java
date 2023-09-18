@@ -6,7 +6,7 @@ package io.strimzi.kafka.quotas.throttle;
 
 import java.time.Clock;
 import java.util.LinkedHashMap;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
@@ -85,14 +85,14 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
         }
     }
 
-    private void updateFactor(Function<ThrottleFactor, ThrottleFactor> throttleFactorUpdater) {
+    private void updateFactor(UnaryOperator<ThrottleFactor> throttleFactorUpdater) {
         boolean changed = updateFactorAndCheckIfChanged(throttleFactorUpdater);
         if (changed) {
             listener.run();
         }
     }
 
-    private synchronized boolean updateFactorAndCheckIfChanged(Function<ThrottleFactor, ThrottleFactor> throttleFactorUpdater) {
+    private synchronized boolean updateFactorAndCheckIfChanged(UnaryOperator<ThrottleFactor> throttleFactorUpdater) {
         ThrottleFactor currentFactor = this.throttleFactor;
         throttleFactor = throttleFactorUpdater.apply(currentFactor);
         boolean changed = currentFactor.getThrottleFactor() != throttleFactor.getThrottleFactor();
@@ -123,5 +123,3 @@ public class PolicyBasedThrottle implements VolumeObserver, ThrottleFactorSource
     }
 
 }
-
-
