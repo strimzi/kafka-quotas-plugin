@@ -44,4 +44,20 @@ class VolumeUsageResultTest {
         // Then
         assertThat(actual).isEqualTo(later);
     }
+
+    @Test
+    void shoul() {
+        // Given
+        Instant earlier = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        Instant later = earlier.plus(1, ChronoUnit.DAYS);
+        final VolumeUsage volumeUsage = new VolumeUsage("0", "/var/log/data", 1000, 1000, earlier);
+        final VolumeUsage volumeUsage2 = new VolumeUsage("1", "/var/log/data", 1000, 1000, later);
+        VolumeUsageResult result = VolumeUsageResult.success(List.of(volumeUsage, volumeUsage2));
+
+        // When
+        Instant actual = result.getObservedAt();
+
+        // Then
+        assertThat(actual).isEqualTo(later);
+    }
 }

@@ -209,7 +209,7 @@ class PolicyBasedThrottleTest {
     }
 
     private void whenVolumeUsageResultSuccessObserved() {
-        VolumeUsage arbitraryUsage = new VolumeUsage("1", "/tmp", 1000, 1000);
+        VolumeUsage arbitraryUsage = new VolumeUsage("1", "/tmp", 1000, 1000, Instant.now());
         policyBasedThrottle.observeVolumeUsage(VolumeUsageResult.success(List.of(arbitraryUsage)));
     }
 
