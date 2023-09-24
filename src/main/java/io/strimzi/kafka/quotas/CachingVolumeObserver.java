@@ -26,15 +26,18 @@ import static io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationS
 public class CachingVolumeObserver implements VolumeObserver {
     private final VolumeObserver observer;
     private final Clock clock;
+    private final Duration entriesValidFor;
     private final ConcurrentMap<CacheKey, VolumeUsage> cachedObservations;
 
     /**
-     * @param observer
-     * @param clock
+     * @param observer The downstream observer to be notified after processing
+     * @param clock the clock to use for managing cache expiry
+     * @param entriesValidFor how long cache valid entries for
      */
-    public CachingVolumeObserver(VolumeObserver observer, Clock clock) {
+    public CachingVolumeObserver(VolumeObserver observer, Clock clock, Duration entriesValidFor) {
         this.observer = observer;
         this.clock = clock;
+        this.entriesValidFor = entriesValidFor;
         cachedObservations = new ConcurrentHashMap<>();
     }
 
@@ -57,7 +60,7 @@ public class CachingVolumeObserver implements VolumeObserver {
     }
 
     private boolean isExpired(VolumeUsage usage) {
-        Instant expiry = usage.getObservedAt().plus(Duration.ofSeconds(60));
+        Instant expiry = usage.getObservedAt().plus(entriesValidFor);
         Instant now = clock.instant();
         return now.equals(expiry) || now.isAfter(expiry);
     }

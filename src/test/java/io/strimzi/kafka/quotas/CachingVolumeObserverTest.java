@@ -21,13 +21,14 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class CachingVolumeObserverTest {
 
+    public static final Duration ONE_MINUTE = Duration.ofMinutes(1);
     @Mock
     private VolumeObserver downstreamObserver;
     private VolumeObserver cachingObserver;
 
     @BeforeEach
     void setUp() {
-        cachingObserver = new CachingVolumeObserver(downstreamObserver, Clock.systemUTC());
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, Clock.systemUTC(), ONE_MINUTE);
     }
 
     @Test
@@ -92,14 +93,14 @@ class CachingVolumeObserverTest {
     void shouldUseOldCacheEntryJustBeforeExpiry() {
         // Given
         final TickableClock clock = new TickableClock();
-        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock);
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE);
         final Instant initialObservationTime = clock.instant();
         final VolumeUsage broker0Initial = new VolumeUsage("0", "/var/lib/data", 1000, 1000, initialObservationTime);
         final VolumeUsage broker1Initial = new VolumeUsage("1", "/var/lib/data", 1000, 1000, initialObservationTime);
         VolumeUsageResult primingObservation = VolumeUsageResult.success(Set.of(broker0Initial, broker1Initial));
         cachingObserver.observeVolumeUsage(primingObservation);
 
-        Duration beforeExpiry = Duration.ofSeconds(60).minusNanos(1);
+        Duration beforeExpiry = ONE_MINUTE.minusNanos(1);
         clock.tick(beforeExpiry);
         final Instant updatedObservationTime = clock.instant();
         final VolumeUsage broker1Final = new VolumeUsage("1", "/var/lib/data", 1000, 500, updatedObservationTime);
@@ -116,14 +117,14 @@ class CachingVolumeObserverTest {
     void shouldExpireOldCacheEntriesOnUpdateExactlyAtExpiryBoundary() {
         // Given
         final TickableClock clock = new TickableClock();
-        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock);
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE);
         final Instant initialObservationTime = clock.instant();
         final VolumeUsage broker0Initial = new VolumeUsage("0", "/var/lib/data", 1000, 1000, initialObservationTime);
         final VolumeUsage broker1Initial = new VolumeUsage("1", "/var/lib/data", 1000, 1000, initialObservationTime);
         VolumeUsageResult primingObservation = VolumeUsageResult.success(Set.of(broker0Initial, broker1Initial));
         cachingObserver.observeVolumeUsage(primingObservation);
 
-        clock.tick(Duration.ofSeconds(60));
+        clock.tick(ONE_MINUTE);
         final Instant updatedObservationTime = clock.instant();
         final VolumeUsage broker1Final = new VolumeUsage("1", "/var/lib/data", 1000, 500, updatedObservationTime);
         final VolumeUsageResult subsequentObservation = VolumeUsageResult.success(Set.of(broker1Final));
@@ -139,14 +140,14 @@ class CachingVolumeObserverTest {
     void shouldExpireOldCacheEntriesOnUpdateAfterExpiryBoundary() {
         // Given
         final TickableClock clock = new TickableClock();
-        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock);
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE);
         final Instant initialObservationTime = clock.instant();
         final VolumeUsage broker0Initial = new VolumeUsage("0", "/var/lib/data", 1000, 1000, initialObservationTime);
         final VolumeUsage broker1Initial = new VolumeUsage("1", "/var/lib/data", 1000, 1000, initialObservationTime);
         VolumeUsageResult primingObservation = VolumeUsageResult.success(Set.of(broker0Initial, broker1Initial));
         cachingObserver.observeVolumeUsage(primingObservation);
 
-        Duration afterExpiryBoundary = Duration.ofSeconds(60).plusNanos(1);
+        Duration afterExpiryBoundary = ONE_MINUTE.plusNanos(1);
         clock.tick(afterExpiryBoundary);
         final Instant updatedObservationTime = clock.instant();
         final VolumeUsage broker1Final = new VolumeUsage("1", "/var/lib/data", 1000, 500, updatedObservationTime);
