@@ -19,9 +19,12 @@ import java.util.stream.Collectors;
 
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
+import com.yammer.metrics.core.Gauge;
+import org.slf4j.Logger;
 
 import static io.strimzi.kafka.quotas.StaticQuotaCallback.metricName;
 import static io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus.SUCCESS;
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Volume Observer that remembers the most recent observation for each brokerId. Then when it observes new result it
@@ -36,6 +39,8 @@ public class CachingVolumeObserver implements VolumeObserver {
     private final LinkedHashMap<String, String> defaultTags;
     private final Map<CacheKey, Counter> evictionsPerRemoteBroker = new ConcurrentHashMap<>();
 
+    private final Logger log = getLogger(CachingVolumeObserver.class);
+
     /**
      * @param observer The downstream observer to be notified after processing
      * @param clock the clock to use for managing cache expiry
@@ -46,16 +51,28 @@ public class CachingVolumeObserver implements VolumeObserver {
         this.observer = observer;
         this.clock = clock;
         this.entriesValidFor = entriesValidFor;
-        this.defaultTags = defaultTags;
+        this.defaultTags = new LinkedHashMap<>(defaultTags);
         cachedObservations = new ConcurrentHashMap<>();
+        Metrics.newGauge(metricName(CachingVolumeObserver.class, "CachedEntries", defaultTags), new Gauge<>() {
+            @Override
+            public Integer value() {
+                return cachedObservations.size();
+            }
+        });
     }
 
     @Override
     public void observeVolumeUsage(VolumeUsageResult result) {
         VolumeUsageResult outgoing;
         if (result.getStatus() == SUCCESS) {
+            if (log.isDebugEnabled()) {
+                log.debug("Caching successful observation. Propagating observation along with cached values where appropriate to the next observer.");
+            }
             outgoing = cacheAndAugment(result);
         } else {
+            if (log.isDebugEnabled()) {
+                log.debug("Not caching failed observation. Propagating failed observation to the next observer.");
+            }
             maybeExpireCachedObservations();
             outgoing = result;
         }
@@ -71,6 +88,9 @@ public class CachingVolumeObserver implements VolumeObserver {
     private void evict(CacheKey key) {
         final Counter counter = getEvictionCounter(key);
         counter.inc();
+        if (log.isDebugEnabled()) {
+            log.debug("evicting entry logDir: {} on broker: {}", key.logDir, key.brokerId);
+        }
         cachedObservations.remove(key);
     }
 

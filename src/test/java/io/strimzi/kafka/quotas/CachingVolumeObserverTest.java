@@ -22,19 +22,21 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static io.strimzi.kafka.quotas.MetricUtils.METRICS_SCOPE;
 import static io.strimzi.kafka.quotas.MetricUtils.assertCounterMetric;
+import static io.strimzi.kafka.quotas.MetricUtils.getMetricGroup;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class CachingVolumeObserverTest {
 
     public static final Duration ONE_MINUTE = Duration.ofMinutes(1);
+    public static final String METRICS_TYPE = "CachingVolumeObserver";
     @Mock
     private VolumeObserver downstreamObserver;
     private VolumeObserver cachingObserver;
 
     @BeforeEach
     void setUp() {
-        MetricUtils.resetMetrics(METRICS_SCOPE, "CachingVolumeObserver");
+        MetricUtils.resetMetrics(METRICS_SCOPE, METRICS_TYPE);
         cachingObserver = new CachingVolumeObserver(downstreamObserver, Clock.systemUTC(), ONE_MINUTE, new LinkedHashMap<String, String>());
     }
 
@@ -185,19 +187,10 @@ class CachingVolumeObserverTest {
         cachingObserver.observeVolumeUsage(primingObservation);
 
         // Then
-        SortedMap<MetricName, Metric> metrics = MetricUtils.getMetricGroup(MetricUtils.METRICS_SCOPE, "CachingVolumeObserver");
+        SortedMap<MetricName, Metric> metrics = MetricUtils.getMetricGroup(MetricUtils.METRICS_SCOPE, METRICS_TYPE);
         assertCounterMetric(metrics, "LogDirEvictions", buildTagMap("0", "/var/lib/data"), 0L);
         assertCounterMetric(metrics, "LogDirEvictions", buildTagMap("0", "/var/lib/data2"), 0L);
         assertCounterMetric(metrics, "LogDirEvictions", buildTagMap("1", "/var/lib/data"), 0L);
-
-    }
-
-    private static LinkedHashMap<String, String> buildTagMap(String brokerId, String logDir) {
-        LinkedHashMap<String, String> tags = new LinkedHashMap<>();
-        tags.put("a", "b");
-        tags.put(StaticQuotaCallback.REMOTE_BROKER_TAG, brokerId);
-        tags.put(StaticQuotaCallback.LOG_DIR_TAG, logDir);
-        return tags;
     }
 
     @Test
@@ -223,8 +216,71 @@ class CachingVolumeObserverTest {
         cachingObserver.observeVolumeUsage(subsequentObservation);
 
         // Then
-        SortedMap<MetricName, Metric> metrics = MetricUtils.getMetricGroup(MetricUtils.METRICS_SCOPE, "CachingVolumeObserver");
+        SortedMap<MetricName, Metric> metrics = MetricUtils.getMetricGroup(MetricUtils.METRICS_SCOPE, METRICS_TYPE);
         final LinkedHashMap<String, String> tags = buildTagMap("0", "/var/lib/data");
         assertCounterMetric(metrics, "LogDirEvictions", tags, 1L);
+    }
+
+    @Test
+    void shouldCountNumberOfEntriesInCache() {
+        // Given
+        final TickableClock clock = new TickableClock();
+        final Instant initialObservationTime = clock.instant();
+        final VolumeUsage broker0Initial = new VolumeUsage("0", "/var/lib/data", 1000, 1000, initialObservationTime);
+        final VolumeUsage broker0Dir2Initial = new VolumeUsage("0", "/var/lib/data2", 1000, 1000, initialObservationTime);
+        final VolumeUsage broker1Initial = new VolumeUsage("1", "/var/lib/data", 1000, 1000, initialObservationTime);
+        final VolumeUsageResult primingObservation = VolumeUsageResult.success(Set.of(broker0Initial, broker0Dir2Initial, broker1Initial));
+
+        LinkedHashMap<String, String> defaultTags = new LinkedHashMap<>();
+        defaultTags.put("a", "b");
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE, defaultTags);
+
+        // When
+        cachingObserver.observeVolumeUsage(primingObservation);
+
+        // Then
+
+        SortedMap<MetricName, Metric> group = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+
+        MetricUtils.assertGaugeMetric(group, "CachedEntries", defaultTags, 3);
+    }
+
+    @Test
+    void shouldReduceCountOfEntriesInCacheOnEviction() {
+        // Given
+        final TickableClock clock = new TickableClock();
+        final Instant initialObservationTime = clock.instant();
+        final VolumeUsage broker0Initial = new VolumeUsage("0", "/var/lib/data", 1000, 1000, initialObservationTime);
+        final VolumeUsage broker0Dir2Initial = new VolumeUsage("0", "/var/lib/data2", 1000, 1000, initialObservationTime);
+        final VolumeUsage broker1Initial = new VolumeUsage("1", "/var/lib/data", 1000, 1000, initialObservationTime);
+        final VolumeUsageResult primingObservation = VolumeUsageResult.success(Set.of(broker0Initial, broker0Dir2Initial, broker1Initial));
+
+        LinkedHashMap<String, String> defaultTags = new LinkedHashMap<>();
+        defaultTags.put("a", "b");
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE, defaultTags);
+        cachingObserver.observeVolumeUsage(primingObservation);
+
+        Duration afterExpiryBoundary = ONE_MINUTE.plusNanos(1);
+        clock.tick(afterExpiryBoundary);
+        final Instant updatedObservationTime = clock.instant();
+        final VolumeUsage broker1Final = new VolumeUsage("1", "/var/lib/data", 1000, 500, updatedObservationTime);
+        final VolumeUsageResult subsequentObservation = VolumeUsageResult.success(Set.of(broker1Final));
+
+        // When
+        cachingObserver.observeVolumeUsage(subsequentObservation);
+
+        // Then
+
+        SortedMap<MetricName, Metric> group = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
+
+        MetricUtils.assertGaugeMetric(group, "CachedEntries", defaultTags, 1);
+    }
+
+    private static LinkedHashMap<String, String> buildTagMap(String brokerId, String logDir) {
+        LinkedHashMap<String, String> tags = new LinkedHashMap<>();
+        tags.put("a", "b");
+        tags.put(StaticQuotaCallback.REMOTE_BROKER_TAG, brokerId);
+        tags.put(StaticQuotaCallback.LOG_DIR_TAG, logDir);
+        return tags;
     }
 }
