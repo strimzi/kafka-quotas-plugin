@@ -48,16 +48,6 @@ import static java.util.stream.Collectors.toSet;
  */
 public class VolumeSource implements Runnable {
 
-    /**
-     * Tag used for metrics to identify the borker which generated the observation.
-     */
-    public static final String REMOTE_BROKER_TAG = "remoteBrokerId";
-
-    /**
-     * Tag used for metrics to identify the logDir included in the observation.
-     */
-    public static final String LOG_DIR_TAG = "logDir";
-
     private final VolumeObserver volumeObserver;
     private final Admin admin;
     private final int timeout;
@@ -200,8 +190,8 @@ public class VolumeSource implements Runnable {
 
     private LinkedHashMap<String, String> buildTagMap(VolumeUsage volumeUsage) {
         final LinkedHashMap<String, String> tags = new LinkedHashMap<>(defaultTags);
-        tags.put(REMOTE_BROKER_TAG, volumeUsage.getBrokerId());
-        tags.put(LOG_DIR_TAG, volumeUsage.getLogDir());
+        tags.put(StaticQuotaCallback.REMOTE_BROKER_TAG, volumeUsage.getBrokerId());
+        tags.put(StaticQuotaCallback.LOG_DIR_TAG, volumeUsage.getLogDir());
         return tags;
     }
 

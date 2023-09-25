@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -16,6 +17,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Counter;
+
+import static io.strimzi.kafka.quotas.StaticQuotaCallback.metricName;
 import static io.strimzi.kafka.quotas.VolumeUsageResult.VolumeSourceObservationStatus.SUCCESS;
 
 /**
@@ -28,26 +33,30 @@ public class CachingVolumeObserver implements VolumeObserver {
     private final Clock clock;
     private final Duration entriesValidFor;
     private final ConcurrentMap<CacheKey, VolumeUsage> cachedObservations;
+    private final LinkedHashMap<String, String> defaultTags;
+    private final Map<CacheKey, Counter> evictionsPerRemoteBroker = new ConcurrentHashMap<>();
 
     /**
      * @param observer The downstream observer to be notified after processing
      * @param clock the clock to use for managing cache expiry
      * @param entriesValidFor how long cache valid entries for
+     * @param defaultTags tags to be added to all metrics
      */
-    public CachingVolumeObserver(VolumeObserver observer, Clock clock, Duration entriesValidFor) {
+    public CachingVolumeObserver(VolumeObserver observer, Clock clock, Duration entriesValidFor, LinkedHashMap<String, String> defaultTags) {
         this.observer = observer;
         this.clock = clock;
         this.entriesValidFor = entriesValidFor;
+        this.defaultTags = defaultTags;
         cachedObservations = new ConcurrentHashMap<>();
     }
 
     @Override
     public void observeVolumeUsage(VolumeUsageResult result) {
-        maybeExpireCachedObservations();
         VolumeUsageResult outgoing;
         if (result.getStatus() == SUCCESS) {
             outgoing = cacheAndAugment(result);
         } else {
+            maybeExpireCachedObservations();
             outgoing = result;
         }
         observer.observeVolumeUsage(outgoing);
@@ -56,7 +65,24 @@ public class CachingVolumeObserver implements VolumeObserver {
     private void maybeExpireCachedObservations() {
         Set<CacheKey> toRemove = cachedObservations.entrySet().stream()
                 .filter(e -> isExpired(e.getValue())).map(Map.Entry::getKey).collect(Collectors.toSet());
-        toRemove.forEach(cachedObservations::remove);
+        toRemove.forEach(this::evict);
+    }
+
+    private void evict(CacheKey key) {
+        final Counter counter = getEvictionCounter(key);
+        counter.inc();
+        cachedObservations.remove(key);
+    }
+
+    private Counter getEvictionCounter(CacheKey key) {
+        return evictionsPerRemoteBroker.computeIfAbsent(key, key1 -> buildCounterForCacheKey("LogDirEvictions", key1));
+    }
+
+    private Counter buildCounterForCacheKey(String name, CacheKey cacheKey) {
+        LinkedHashMap<String, String> tags = new LinkedHashMap<>(defaultTags);
+        tags.put(StaticQuotaCallback.REMOTE_BROKER_TAG, cacheKey.brokerId);
+        tags.put(StaticQuotaCallback.LOG_DIR_TAG, cacheKey.logDir);
+        return Metrics.newCounter(metricName(CachingVolumeObserver.class, name, tags));
     }
 
     private boolean isExpired(VolumeUsage usage) {
@@ -68,11 +94,18 @@ public class CachingVolumeObserver implements VolumeObserver {
     private VolumeUsageResult cacheAndAugment(VolumeUsageResult result) {
         cachedObservations.putAll(result.getVolumeUsages()
                 .stream()
-                .collect(Collectors.toMap(usage -> new CacheKey(usage.getBrokerId(), usage.getLogDir()), usage -> usage)));
+                .collect(Collectors.toMap(this::createCacheKey, usage -> usage)));
 
+        maybeExpireCachedObservations();
         final Collection<VolumeUsage> mergedUsage = Set.copyOf(cachedObservations.values());
 
         return VolumeUsageResult.replaceObservations(result, mergedUsage);
+    }
+
+    private CacheKey createCacheKey(VolumeUsage usage) {
+        final CacheKey key = new CacheKey(usage.getBrokerId(), usage.getLogDir());
+        getEvictionCounter(key);
+        return key;
     }
 
     private static class CacheKey {

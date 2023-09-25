@@ -397,8 +397,8 @@ class VolumeSourceTest {
 
     private static LinkedHashMap<String, String> buildTagMap(int remoteNodeId, String logDir) {
         final LinkedHashMap<String, String> tags = buildBasicTagMap();
-        tags.put(VolumeSource.REMOTE_BROKER_TAG, String.valueOf(remoteNodeId));
-        tags.put(VolumeSource.LOG_DIR_TAG, logDir);
+        tags.put(StaticQuotaCallback.REMOTE_BROKER_TAG, String.valueOf(remoteNodeId));
+        tags.put(StaticQuotaCallback.LOG_DIR_TAG, logDir);
         return tags;
     }
 

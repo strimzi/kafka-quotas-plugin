@@ -44,6 +44,14 @@ import static java.util.Locale.ENGLISH;
  * Allows configuring generic quotas for a broker independent of users and clients.
  */
 public class StaticQuotaCallback implements ClientQuotaCallback {
+    /**
+     * Tag used for metrics to identify the broker which generated the observation.
+     */
+    public static final String REMOTE_BROKER_TAG = "remoteBrokerId";
+    /**
+     * Tag used for metrics to identify the logDir included in the observation.
+     */
+    public static final String LOG_DIR_TAG = "logDir";
     private static final Logger log = LoggerFactory.getLogger(StaticQuotaCallback.class);
     private static final String EXCLUDED_PRINCIPAL_QUOTA_KEY = "excluded-principal-quota-key";
     private final Clock clock;
@@ -177,7 +185,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE), expiryPolicy, config.getFallbackThrottleFactor(), defaultTags);
             throttleFactorSource = factorNotifier;
 
-            VolumeObserver observer = new CachingVolumeObserver(factorNotifier, clock, config.getThrottleFactorValidityDuration());
+            VolumeObserver observer = new CachingVolumeObserver(factorNotifier, clock, config.getThrottleFactorValidityDuration(), defaultTags);
             Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(observer).withDefaultTags(defaultTags).build();
             backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckInterval, TimeUnit.SECONDS);
             backgroundScheduler.scheduleWithFixedDelay(factorNotifier::checkThrottleFactorValidity, 0, 10, TimeUnit.SECONDS);

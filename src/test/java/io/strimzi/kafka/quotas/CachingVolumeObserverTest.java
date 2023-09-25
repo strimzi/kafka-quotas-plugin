@@ -8,14 +8,20 @@ package io.strimzi.kafka.quotas;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Set;
+import java.util.SortedMap;
 
+import com.yammer.metrics.core.Metric;
+import com.yammer.metrics.core.MetricName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static io.strimzi.kafka.quotas.MetricUtils.METRICS_SCOPE;
+import static io.strimzi.kafka.quotas.MetricUtils.assertCounterMetric;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,7 +34,8 @@ class CachingVolumeObserverTest {
 
     @BeforeEach
     void setUp() {
-        cachingObserver = new CachingVolumeObserver(downstreamObserver, Clock.systemUTC(), ONE_MINUTE);
+        MetricUtils.resetMetrics(METRICS_SCOPE, "CachingVolumeObserver");
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, Clock.systemUTC(), ONE_MINUTE, new LinkedHashMap<String, String>());
     }
 
     @Test
@@ -93,7 +100,7 @@ class CachingVolumeObserverTest {
     void shouldUseOldCacheEntryJustBeforeExpiry() {
         // Given
         final TickableClock clock = new TickableClock();
-        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE);
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE, new LinkedHashMap<String, String>());
         final Instant initialObservationTime = clock.instant();
         final VolumeUsage broker0Initial = new VolumeUsage("0", "/var/lib/data", 1000, 1000, initialObservationTime);
         final VolumeUsage broker1Initial = new VolumeUsage("1", "/var/lib/data", 1000, 1000, initialObservationTime);
@@ -117,7 +124,7 @@ class CachingVolumeObserverTest {
     void shouldExpireOldCacheEntriesOnUpdateExactlyAtExpiryBoundary() {
         // Given
         final TickableClock clock = new TickableClock();
-        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE);
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE, new LinkedHashMap<String, String>());
         final Instant initialObservationTime = clock.instant();
         final VolumeUsage broker0Initial = new VolumeUsage("0", "/var/lib/data", 1000, 1000, initialObservationTime);
         final VolumeUsage broker1Initial = new VolumeUsage("1", "/var/lib/data", 1000, 1000, initialObservationTime);
@@ -140,7 +147,7 @@ class CachingVolumeObserverTest {
     void shouldExpireOldCacheEntriesOnUpdateAfterExpiryBoundary() {
         // Given
         final TickableClock clock = new TickableClock();
-        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE);
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE, new LinkedHashMap<String, String>());
         final Instant initialObservationTime = clock.instant();
         final VolumeUsage broker0Initial = new VolumeUsage("0", "/var/lib/data", 1000, 1000, initialObservationTime);
         final VolumeUsage broker1Initial = new VolumeUsage("1", "/var/lib/data", 1000, 1000, initialObservationTime);
@@ -158,5 +165,66 @@ class CachingVolumeObserverTest {
 
         // Then
         verify(downstreamObserver).observeVolumeUsage(VolumeUsageResult.success(Set.of(broker1Final)));
+    }
+
+    @Test
+    void shouldInitialiseEvictionsCounterPerLogDir() {
+        // Given
+        final TickableClock clock = new TickableClock();
+        final Instant initialObservationTime = clock.instant();
+        final VolumeUsage broker0Initial = new VolumeUsage("0", "/var/lib/data", 1000, 1000, initialObservationTime);
+        final VolumeUsage broker0Dir2Initial = new VolumeUsage("0", "/var/lib/data2", 1000, 1000, initialObservationTime);
+        final VolumeUsage broker1Initial = new VolumeUsage("1", "/var/lib/data", 1000, 1000, initialObservationTime);
+        final VolumeUsageResult primingObservation = VolumeUsageResult.success(Set.of(broker0Initial, broker0Dir2Initial, broker1Initial));
+
+        LinkedHashMap<String, String> defaultTags = new LinkedHashMap<>();
+        defaultTags.put("a", "b");
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE, defaultTags);
+
+        // When
+        cachingObserver.observeVolumeUsage(primingObservation);
+
+        // Then
+        SortedMap<MetricName, Metric> metrics = MetricUtils.getMetricGroup(MetricUtils.METRICS_SCOPE, "CachingVolumeObserver");
+        assertCounterMetric(metrics, "LogDirEvictions", buildTagMap("0", "/var/lib/data"), 0L);
+        assertCounterMetric(metrics, "LogDirEvictions", buildTagMap("0", "/var/lib/data2"), 0L);
+        assertCounterMetric(metrics, "LogDirEvictions", buildTagMap("1", "/var/lib/data"), 0L);
+
+    }
+
+    private static LinkedHashMap<String, String> buildTagMap(String brokerId, String logDir) {
+        LinkedHashMap<String, String> tags = new LinkedHashMap<>();
+        tags.put("a", "b");
+        tags.put(StaticQuotaCallback.REMOTE_BROKER_TAG, brokerId);
+        tags.put(StaticQuotaCallback.LOG_DIR_TAG, logDir);
+        return tags;
+    }
+
+    @Test
+    void shouldRecordCountOfEvictionsPerRemoteBroker() {
+        // Given
+        final TickableClock clock = new TickableClock();
+        LinkedHashMap<String, String> defaultTags = new LinkedHashMap<>();
+        defaultTags.put("a", "b");
+        cachingObserver = new CachingVolumeObserver(downstreamObserver, clock, ONE_MINUTE, defaultTags);
+        final Instant initialObservationTime = clock.instant();
+        final VolumeUsage broker0Initial = new VolumeUsage("0", "/var/lib/data", 1000, 1000, initialObservationTime);
+        final VolumeUsage broker1Initial = new VolumeUsage("1", "/var/lib/data", 1000, 1000, initialObservationTime);
+        VolumeUsageResult primingObservation = VolumeUsageResult.success(Set.of(broker0Initial, broker1Initial));
+        cachingObserver.observeVolumeUsage(primingObservation);
+
+        Duration afterExpiryBoundary = ONE_MINUTE.plusNanos(1);
+        clock.tick(afterExpiryBoundary);
+        final Instant updatedObservationTime = clock.instant();
+        final VolumeUsage broker1Final = new VolumeUsage("1", "/var/lib/data", 1000, 500, updatedObservationTime);
+        final VolumeUsageResult subsequentObservation = VolumeUsageResult.success(Set.of(broker1Final));
+
+        // When
+        cachingObserver.observeVolumeUsage(subsequentObservation);
+
+        // Then
+        SortedMap<MetricName, Metric> metrics = MetricUtils.getMetricGroup(MetricUtils.METRICS_SCOPE, "CachingVolumeObserver");
+        final LinkedHashMap<String, String> tags = buildTagMap("0", "/var/lib/data");
+        assertCounterMetric(metrics, "LogDirEvictions", tags, 1L);
     }
 }
