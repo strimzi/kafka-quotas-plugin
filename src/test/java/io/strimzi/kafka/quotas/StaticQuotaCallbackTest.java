@@ -4,6 +4,8 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,8 +62,8 @@ class StaticQuotaCallbackTest {
     @Mock(lenient = true)
     VolumeSourceBuilder volumeSourceBuilder;
 
-    private static VolumeUsage newVolume(long availableBytes) {
-        return new VolumeUsage("-1", "test", VOLUME_CAPACITY, availableBytes, Instant.now());
+    private static VolumeUsage newVolume(long availableBytes, Instant observedAt) {
+        return new VolumeUsage("-1", "test", VOLUME_CAPACITY, availableBytes, observedAt);
     }
 
     StaticQuotaCallback target;
@@ -112,7 +114,7 @@ class StaticQuotaCallbackTest {
         ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
         when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
 
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler, Clock.systemUTC());
 
         quotaCallback.configure(Map.of(
                 StaticQuotaConfig.AVAILABLE_BYTES_PROP, "15",
@@ -122,7 +124,7 @@ class StaticQuotaCallbackTest {
         ));
 
         //When
-        argument.getValue().observeVolumeUsage(success(List.of(newVolume(10L))));
+        argument.getValue().observeVolumeUsage(success(List.of(newVolume(10L, Instant.now()))));
 
         //Then
         double quotaLimit = quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of());
@@ -135,7 +137,7 @@ class StaticQuotaCallbackTest {
         ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
         when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
 
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler, Clock.systemUTC());
 
         quotaCallback.configure(Map.of(
                 StaticQuotaConfig.AVAILABLE_RATIO_PROP, "0.5",
@@ -158,7 +160,7 @@ class StaticQuotaCallbackTest {
         ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
         when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
 
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler, Clock.systemUTC());
 
         //Then
         assertThrows(IllegalStateException.class, () -> quotaCallback.configure(Map.of(
@@ -188,7 +190,7 @@ class StaticQuotaCallbackTest {
     void shouldScheduleStorageChecker() {
         //Given
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService, Clock.systemUTC());
 
         //When
         target.configure(MINIMUM_EXECUTABLE_CONFIG);
@@ -202,7 +204,7 @@ class StaticQuotaCallbackTest {
     void shouldNotScheduleStorageCheckWhenCheckIntervalIsZero() {
         //Given
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService, Clock.systemUTC());
 
         //When
         target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "0", StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
@@ -215,7 +217,7 @@ class StaticQuotaCallbackTest {
     void shouldNotScheduleStorageCheckWhenCheckIntervalIsNotProvided() {
         //Given
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService, Clock.systemUTC());
 
         //When
         target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", BROKER_ID_PROPERTY, BROKER_ID));
@@ -228,7 +230,7 @@ class StaticQuotaCallbackTest {
     void shouldShutdownExecutorOnClose() {
         //Given
         ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService);
+        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService, Clock.systemUTC());
         target.configure(MINIMUM_EXECUTABLE_CONFIG);
 
         //When
@@ -239,10 +241,58 @@ class StaticQuotaCallbackTest {
     }
 
     @Test
+    void observationsForNodesThatDropOutOfActiveSetAreValidUntilExpiry() {
+        // given
+        ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
+        when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
+        TickableClock clock = new TickableClock();
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler, clock);
+        quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
+        VolumeObserver volumeObserver = argument.getValue();
+        quotaCallback.updateClusterMetadata(null);
+        volumeObserver.observeVolumeUsage(success(List.of(new VolumeUsage("0", "dir1", VOLUME_CAPACITY, 0, clock.instant()))));
+        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "expect reset required after first observation");
+        Duration beforeEndOfValidityDuration = Duration.ofMinutes(5).minusNanos(1);
+        clock.tick(beforeEndOfValidityDuration);
+
+        // when
+        volumeObserver.observeVolumeUsage(success(List.of(new VolumeUsage("1", "dir1", VOLUME_CAPACITY, VOLUME_CAPACITY, clock.instant()))));
+
+        // then
+        assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected reset required after second observation");
+        assertEquals(1d, quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of()));
+        quotaCallback.close();
+    }
+
+    @Test
+    void cachedObservationsExpireAfterValidityDuration() {
+        // given
+        ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
+        when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
+        TickableClock clock = new TickableClock();
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler, clock);
+        quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
+        VolumeObserver volumeObserver = argument.getValue();
+        quotaCallback.updateClusterMetadata(null);
+        volumeObserver.observeVolumeUsage(success(List.of(new VolumeUsage("0", "dir1", VOLUME_CAPACITY, 0, clock.instant()))));
+        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "expect reset required after first observation");
+        clock.tick(Duration.ofMinutes(5));
+
+        // when
+        volumeObserver.observeVolumeUsage(success(List.of(new VolumeUsage("1", "dir1", VOLUME_CAPACITY, VOLUME_CAPACITY, clock.instant()))));
+
+        // then
+        assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "expect reset required after second observation");
+        assertEquals(Double.MAX_VALUE, quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of()));
+
+        quotaCallback.close();
+    }
+
+    @Test
     void quotaResetRequiredShouldRespectQuotaType() {
         ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
         when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler, Clock.systemUTC());
         quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
         VolumeObserver volumeObserver = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
@@ -254,7 +304,7 @@ class StaticQuotaCallbackTest {
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.FETCH), "unexpected state on subsequent call without storage state change");
 
         //When
-        volumeObserver.observeVolumeUsage(success(List.of(newVolume(2))));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(2, Instant.now()))));
 
         //Then
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
@@ -267,18 +317,18 @@ class StaticQuotaCallbackTest {
     void quotaResetRequired() {
         ArgumentCaptor<VolumeObserver> argument = ArgumentCaptor.forClass(VolumeObserver.class);
         when(volumeSourceBuilder.withVolumeObserver(argument.capture())).thenReturn(volumeSourceBuilder);
-        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler);
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, backgroundScheduler, Clock.systemUTC());
         quotaCallback.configure(MINIMUM_EXECUTABLE_CONFIG);
         VolumeObserver volumeObserver = argument.getValue();
         quotaCallback.updateClusterMetadata(null);
 
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected initial state");
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        volumeObserver.observeVolumeUsage(success(List.of(newVolume(1))));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(1, Instant.now()))));
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 1st storage state change");
-        volumeObserver.observeVolumeUsage(success(List.of(newVolume(1))));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(1, Instant.now()))));
         assertFalse(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call without storage state change");
-        volumeObserver.observeVolumeUsage(success(List.of(newVolume(3))));
+        volumeObserver.observeVolumeUsage(success(List.of(newVolume(3, Instant.now()))));
         assertTrue(quotaCallback.quotaResetRequired(ClientQuotaType.PRODUCE), "unexpected state on subsequent call after 2nd storage state change");
 
         quotaCallback.close();
