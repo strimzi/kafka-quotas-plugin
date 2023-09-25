@@ -124,7 +124,7 @@ public class VolumeSource implements Runnable {
 
     private void notifyObserver(VolumeUsageResult result) {
         if (log.isDebugEnabled()) {
-            log.debug("Notifying consumers of volumes usage result: " + result);
+            log.debug("Notifying consumers of volumes usage result: {}", result);
         }
         volumeObserver.observeVolumeUsage(result);
     }
@@ -159,7 +159,7 @@ public class VolumeSource implements Runnable {
 
     private VolumeUsageResult onDescribeLogDirSuccess(Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker) {
         if (log.isDebugEnabled()) {
-            log.debug("Successfully described logDirs: " + logDirsPerBroker);
+            log.debug("Successfully described logDirs: {}", logDirsPerBroker);
         }
         List<VolumeUsage> volumeUsages = logDirsPerBroker.entrySet()
                 .stream()
