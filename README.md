@@ -57,15 +57,17 @@ The plugin currently provides the following metrics:
 
 ### Additional metrics for cluster wide monitoring
 
-| Name                          | Metric Type | Meaning                                                                        | Type           | Tags                                          |
-|-------------------------------|-------------|--------------------------------------------------------------------------------|----------------|-----------------------------------------------|
-| ThrottleFactor                | Gauge       | The current factor applied by the plug-in [0..1]                               | ThrottleFactor | `observingBrokerId`                           |
-| FallbackThrottleFactorApplied | Counter     | The number of times the plug-in has transitioned to using the fall back factor | ThrottleFactor | `observingBrokerId`                           |
-| LimitViolated                 | Counter     | A count of the number `logDir`s which violate the configured limit             | ThrottleFactor | `observingBrokerId`                           |
-| ActiveBrokers                 | Gauge       | The current number of brokers returned by the describeCluster rpc              | VolumeSource   | `observingBrokerId`                           |
-| ActiveLogDirs                 | Gauge       | The number of logDirs returned by the describeLogDirs RPC                      | VolumeSource   | `observingBrokerId`                           | 
-| AvailableBytes                | Gauge       | The number of available bytes returned by the describeLogDirs RPC              | VolumeSource   | `[observingBrokerId, remoteBrokerId, logDir]` |
-| ConsumedBytes                 | Gauge       | The number of consumed bytes returned by the describeLogDirs RPC               | VolumeSource   | `[observingBrokerId, remoteBrokerId, logDir]` |
+| Name                          | Metric Type | Meaning                                                                        | Type                  | Tags                                          |
+|-------------------------------|-------------|--------------------------------------------------------------------------------|-----------------------|-----------------------------------------------|
+| ThrottleFactor                | Gauge       | The current factor applied by the plug-in [0..1]                               | ThrottleFactor        | `observingBrokerId`                           |
+| FallbackThrottleFactorApplied | Counter     | The number of times the plug-in has transitioned to using the fall back factor | ThrottleFactor        | `observingBrokerId`                           |
+| LimitViolated                 | Counter     | A count of the number `logDir`s which violate the configured limit             | ThrottleFactor        | `observingBrokerId`                           |
+| ActiveBrokers                 | Gauge       | The current number of brokers returned by the describeCluster rpc              | VolumeSource          | `observingBrokerId`                           |
+| ActiveLogDirs                 | Gauge       | The number of logDirs returned by the describeLogDirs RPC                      | VolumeSource          | `observingBrokerId`                           | 
+| AvailableBytes                | Gauge       | The number of available bytes returned by the describeLogDirs RPC              | VolumeSource          | `[observingBrokerId, remoteBrokerId, logDir]` |
+| ConsumedBytes                 | Gauge       | The number of consumed bytes returned by the describeLogDirs RPC               | VolumeSource          | `[observingBrokerId, remoteBrokerId, logDir]` |
+| CachedEntries                 | Gauge       | The number of logDirs currently cached by the plug-in                          | CachingVolumeObserver | `observingBrokerId`                           |
+| LogDirEvictions               | Counter     | The number of times each remoteBroker.logDir has been removed from the cache.  | CachingVolumeObserver | `[observingBrokerId, remoteBrokerId, logDir]` |
 
 ### Tag definitions
 | Tag               | Definition                                                             |
