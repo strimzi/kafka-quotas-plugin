@@ -236,7 +236,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         final String sanitisedGroup = sanitise(group);
         final String sanitisedType = sanitise(type);
         final String sanitisedName = sanitise(name);
-        String mBeanName = java.lang.String.format("%s:type=%s,name=%s", sanitisedGroup, sanitisedType, sanitisedName);
+        String mBeanName = String.format("%s:type=%s,name=%s", sanitisedGroup, sanitisedType, sanitisedName);
         return new MetricName(sanitisedGroup, sanitisedType, sanitisedName, SCOPE, mBeanName);
     }
 
@@ -250,15 +250,15 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
      * @return the MetricName object derived from the arguments.
      */
     public static MetricName metricName(String name, String type, String group, LinkedHashMap<String, String> tags) {
-        final String tagValues = tags.entrySet().stream().map(entry -> java.lang.String.format("%s=%s", sanitise(entry.getKey()), sanitise(entry.getValue()))).collect(Collectors.joining(","));
+        final String tagValues = tags.entrySet().stream().map(entry -> String.format("%s=%s", sanitise(entry.getKey()), sanitise(entry.getValue()))).collect(Collectors.joining(","));
         String mBeanName;
         final String sanitisedGroup = sanitise(group);
         final String sanitisedType = sanitise(type);
         final String sanitisedName = sanitise(name);
         if (!tagValues.isBlank()) {
-            mBeanName = java.lang.String.format("%s:type=%s,name=%s,%s", sanitisedGroup, sanitisedType, sanitisedName, tagValues);
+            mBeanName = String.format("%s:type=%s,name=%s,%s", sanitisedGroup, sanitisedType, sanitisedName, tagValues);
         } else {
-            mBeanName = java.lang.String.format("%s:type=%s,name=%s", sanitisedGroup, sanitisedType, sanitisedName);
+            mBeanName = String.format("%s:type=%s,name=%s", sanitisedGroup, sanitisedType, sanitisedName);
         }
         return new MetricName(sanitisedGroup, sanitisedType, sanitisedName, SCOPE, mBeanName);
     }
