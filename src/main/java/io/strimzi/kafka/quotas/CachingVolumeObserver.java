@@ -95,14 +95,14 @@ public class CachingVolumeObserver implements VolumeObserver {
     }
 
     private Counter evictionCounter(CacheKey key) {
-        return evictionsPerRemoteBroker.computeIfAbsent(key, key1 -> buildCounterForCacheKey("LogDirEvictions", key1));
+        return evictionsPerRemoteBroker.computeIfAbsent(key, this::buildEvictionCounter);
     }
 
-    private Counter buildCounterForCacheKey(String name, CacheKey cacheKey) {
+    private Counter buildEvictionCounter(CacheKey cacheKey) {
         LinkedHashMap<String, String> tags = new LinkedHashMap<>(defaultTags);
         tags.put(StaticQuotaCallback.REMOTE_BROKER_TAG, cacheKey.brokerId);
         tags.put(StaticQuotaCallback.LOG_DIR_TAG, cacheKey.logDir);
-        return Metrics.newCounter(metricName(CachingVolumeObserver.class, name, tags));
+        return Metrics.newCounter(metricName(CachingVolumeObserver.class, "LogDirEvictions", tags));
     }
 
     private boolean isExpired(VolumeUsage usage) {
