@@ -86,7 +86,7 @@ public class CachingVolumeObserver implements VolumeObserver {
     }
 
     private void evict(CacheKey key) {
-        final Counter counter = getEvictionCounter(key);
+        final Counter counter = evictionCounter(key);
         counter.inc();
         if (log.isDebugEnabled()) {
             log.debug("evicting entry logDir: {} on broker: {}", key.logDir, key.brokerId);
@@ -94,7 +94,7 @@ public class CachingVolumeObserver implements VolumeObserver {
         cachedObservations.remove(key);
     }
 
-    private Counter getEvictionCounter(CacheKey key) {
+    private Counter evictionCounter(CacheKey key) {
         return evictionsPerRemoteBroker.computeIfAbsent(key, key1 -> buildCounterForCacheKey("LogDirEvictions", key1));
     }
 
@@ -124,7 +124,8 @@ public class CachingVolumeObserver implements VolumeObserver {
 
     private CacheKey createCacheKey(VolumeUsage usage) {
         final CacheKey key = new CacheKey(usage.getBrokerId(), usage.getLogDir());
-        getEvictionCounter(key);
+        //eagerly get the eviction counter, rather than on first eviction, to ensure it is initialised to zero.
+        evictionCounter(key);
         return key;
     }
 
