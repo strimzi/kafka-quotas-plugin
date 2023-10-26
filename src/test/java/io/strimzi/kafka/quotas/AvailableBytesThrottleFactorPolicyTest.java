@@ -5,6 +5,7 @@
 
 package io.strimzi.kafka.quotas;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.SortedMap;
 
@@ -108,6 +109,6 @@ class AvailableBytesThrottleFactorPolicyTest {
     }
 
     private static VolumeUsage volumeWithAvailableBytes(long availableBytes) {
-        return new VolumeUsage("0", "/var/lib/data", 1000L, availableBytes);
+        return new VolumeUsage("0", "/var/lib/data", 1000L, availableBytes, Instant.now());
     }
 }

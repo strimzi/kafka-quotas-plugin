@@ -5,6 +5,7 @@
 
 package io.strimzi.kafka.quotas;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,16 +47,6 @@ import static java.util.stream.Collectors.toSet;
  * A listener is registered with this volume source to act on the disk usage information.
  */
 public class VolumeSource implements Runnable {
-
-    /**
-     * Tag used for metrics to identify the borker which generated the observation.
-     */
-    public static final String REMOTE_BROKER_TAG = "remoteBrokerId";
-
-    /**
-     * Tag used for metrics to identify the logDir included in the observation.
-     */
-    public static final String LOG_DIR_TAG = "logDir";
 
     private final VolumeObserver volumeObserver;
     private final Admin admin;
@@ -133,7 +124,7 @@ public class VolumeSource implements Runnable {
 
     private void notifyObserver(VolumeUsageResult result) {
         if (log.isDebugEnabled()) {
-            log.debug("Notifying consumers of volumes usage result: " + result);
+            log.debug("Notifying consumers of volumes usage result: {}", result);
         }
         volumeObserver.observeVolumeUsage(result);
     }
@@ -168,7 +159,7 @@ public class VolumeSource implements Runnable {
 
     private VolumeUsageResult onDescribeLogDirSuccess(Map<Integer, Map<String, LogDirDescription>> logDirsPerBroker) {
         if (log.isDebugEnabled()) {
-            log.debug("Successfully described logDirs: " + logDirsPerBroker);
+            log.debug("Successfully described logDirs: {}", logDirsPerBroker);
         }
         List<VolumeUsage> volumeUsages = logDirsPerBroker.entrySet()
                 .stream()
@@ -199,8 +190,8 @@ public class VolumeSource implements Runnable {
 
     private LinkedHashMap<String, String> buildTagMap(VolumeUsage volumeUsage) {
         final LinkedHashMap<String, String> tags = new LinkedHashMap<>(defaultTags);
-        tags.put(REMOTE_BROKER_TAG, volumeUsage.getBrokerId());
-        tags.put(LOG_DIR_TAG, volumeUsage.getLogDir());
+        tags.put(StaticQuotaCallback.REMOTE_BROKER_TAG, volumeUsage.getBrokerId());
+        tags.put(StaticQuotaCallback.LOG_DIR_TAG, volumeUsage.getLogDir());
         return tags;
     }
 
@@ -212,7 +203,8 @@ public class VolumeSource implements Runnable {
             if (logDirDescription.totalBytes().isPresent() && logDirDescription.usableBytes().isPresent()) {
                 final long totalBytes = logDirDescription.totalBytes().getAsLong();
                 final long usableBytes = logDirDescription.usableBytes().getAsLong();
-                return new VolumeUsage(String.valueOf(brokerIdToLogDirs.getKey()), logDirs.getKey(), totalBytes, usableBytes);
+                // TODO clock instead of Instant.now()
+                return new VolumeUsage(String.valueOf(brokerIdToLogDirs.getKey()), logDirs.getKey(), totalBytes, usableBytes, Instant.now());
             } else {
                 return null;
             }

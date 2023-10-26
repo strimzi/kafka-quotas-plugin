@@ -5,14 +5,15 @@
 
 package io.strimzi.kafka.quotas;
 
+import java.time.Instant;
+import java.util.List;
+
 import io.strimzi.kafka.quotas.throttle.AvailableRatioThrottleFactorPolicy;
 import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -80,7 +81,7 @@ class AvailableRatioThrottleFactorPolicyTest {
         //When
         long capacity = 0L;
         final double actualFactor = availableBytesThrottleFactorSupplier.calculateFactor(List.of(volumeWithAvailableRatio(0.5),
-                new VolumeUsage("0", "/var/lib/data", capacity, 100)));
+                new VolumeUsage("0", "/var/lib/data", capacity, 100, Instant.now())));
 
         //Then
         assertThat(actualFactor).isCloseTo(0.0d, OFFSET);
@@ -88,6 +89,6 @@ class AvailableRatioThrottleFactorPolicyTest {
 
     private static VolumeUsage volumeWithAvailableRatio(double availableRatio) {
         int available = 100;
-        return new VolumeUsage("0", "/var/lib/data", (long) (available / availableRatio), available);
+        return new VolumeUsage("0", "/var/lib/data", (long) (available / availableRatio), available, Instant.now());
     }
 }

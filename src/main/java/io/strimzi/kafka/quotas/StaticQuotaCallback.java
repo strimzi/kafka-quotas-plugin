@@ -44,15 +44,24 @@ import static java.util.Locale.ENGLISH;
  * Allows configuring generic quotas for a broker independent of users and clients.
  */
 public class StaticQuotaCallback implements ClientQuotaCallback {
+    /**
+     * Tag used for metrics to identify the broker which generated the observation.
+     */
+    public static final String REMOTE_BROKER_TAG = "remoteBrokerId";
+    /**
+     * Tag used for metrics to identify the logDir included in the observation.
+     */
+    public static final String LOG_DIR_TAG = "logDir";
     private static final Logger log = LoggerFactory.getLogger(StaticQuotaCallback.class);
     private static final String EXCLUDED_PRINCIPAL_QUOTA_KEY = "excluded-principal-quota-key";
+    private final Clock clock;
 
     private volatile Map<ClientQuotaType, Quota> quotaMap = new HashMap<>();
     private volatile List<String> excludedPrincipalNameList = List.of();
     private final Set<ClientQuotaType> resetQuota = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private volatile ThrottleFactorSource throttleFactorSource = UnlimitedThrottleFactorSource.UNLIMITED_THROTTLE_FACTOR_SOURCE;
     private final VolumeSourceBuilder volumeSourceBuilder;
-    private final static String SCOPE = "io.strimzi.kafka.quotas.StaticQuotaCallback";
+    private static final String SCOPE = "io.strimzi.kafka.quotas.StaticQuotaCallback";
 
     private final ScheduledExecutorService backgroundScheduler;
 
@@ -68,11 +77,13 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
      * It provides a default {@link io.strimzi.kafka.quotas.VolumeSourceBuilder#VolumeSourceBuilder()} and a scheduled executor for running background tasks on named threads.
      */
     public StaticQuotaCallback() {
-        this(new VolumeSourceBuilder(), Executors.newScheduledThreadPool(2, r -> {
-            final Thread thread = new Thread(r, StaticQuotaCallback.class.getSimpleName() + "-taskExecutor");
-            thread.setDaemon(true);
-            return thread;
-        }));
+        this(new VolumeSourceBuilder(),
+                Executors.newScheduledThreadPool(2, r -> {
+                    final Thread thread = new Thread(r, StaticQuotaCallback.class.getSimpleName() + "-taskExecutor");
+                    thread.setDaemon(true);
+                    return thread;
+                }),
+                Clock.systemUTC());
     }
 
     /**
@@ -80,11 +91,15 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
      *
      * @param volumeSourceBuilder the {@link io.strimzi.kafka.quotas.VolumeSourceBuilder#VolumeSourceBuilder()} to use
      * @param backgroundScheduler the scheduler for executing background tasks.
+     * @param clock the time source to use when evaluating expiry
      */
-    /*test*/ StaticQuotaCallback(VolumeSourceBuilder volumeSourceBuilder, ScheduledExecutorService backgroundScheduler) {
+    /*test*/ StaticQuotaCallback(VolumeSourceBuilder volumeSourceBuilder,
+                                 ScheduledExecutorService backgroundScheduler,
+                                 Clock clock) {
         this.volumeSourceBuilder = volumeSourceBuilder;
         this.backgroundScheduler = backgroundScheduler;
         Collections.addAll(resetQuota, ClientQuotaType.values());
+        this.clock = clock;
     }
 
     @Override
@@ -166,11 +181,12 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             } else {
                 throw new IllegalStateException("storageCheckInterval > 0 but no limit type configured");
             }
-            FixedDurationExpiryPolicy expiryPolicy = new FixedDurationExpiryPolicy(Clock.systemUTC(), config.getThrottleFactorValidityDuration());
+            FixedDurationExpiryPolicy expiryPolicy = new FixedDurationExpiryPolicy(clock, config.getThrottleFactorValidityDuration());
             final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE), expiryPolicy, config.getFallbackThrottleFactor(), defaultTags);
             throttleFactorSource = factorNotifier;
 
-            Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(factorNotifier).withDefaultTags(defaultTags).build();
+            VolumeObserver observer = new CachingVolumeObserver(factorNotifier, clock, config.getThrottleFactorValidityDuration(), defaultTags);
+            Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(observer).withDefaultTags(defaultTags).build();
             backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckInterval, TimeUnit.SECONDS);
             backgroundScheduler.scheduleWithFixedDelay(factorNotifier::checkThrottleFactorValidity, 0, 10, TimeUnit.SECONDS);
             log.info("Configured quota callback with {}. Storage check interval: {}s", quotaMap, storageCheckInterval);

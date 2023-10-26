@@ -4,9 +4,12 @@
  */
 package io.strimzi.kafka.quotas;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 
 /**
@@ -33,6 +36,14 @@ public class VolumeUsageResult {
      */
     public VolumeSourceObservationStatus getStatus() {
         return status;
+    }
+
+    /**
+     * The most recent value for when the log dirs were observed
+     * @return An instant marking the most recent observation of any log dir.
+     */
+    public Instant getObservedAt() {
+        return volumeUsages.stream().map(VolumeUsage::getObservedAt).max(Comparator.naturalOrder()).orElseThrow();
     }
 
     /**
@@ -108,6 +119,16 @@ public class VolumeUsageResult {
         return new VolumeUsageResult(List.of(), status, cause);
     }
 
+    /**
+     * Clone the original observation and replace the set of observations with the replacements.
+     * @param original the VolumeUsageResult to be copied
+     * @param replacement the replacement set of observations
+     * @return The merged VolumeUsageResult
+     */
+    public static VolumeUsageResult replaceObservations(VolumeUsageResult original, Collection<VolumeUsage> replacement) {
+        return new VolumeUsageResult(replacement, original.status, original.causeOfFailure);
+    }
+
     @Override
     public String toString() {
         return "VolumeUsageObservation{" +
@@ -115,5 +136,18 @@ public class VolumeUsageResult {
                 ", status=" + status +
                 ", throwable=" + causeOfFailure +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        VolumeUsageResult that = (VolumeUsageResult) o;
+        return Objects.equals(volumeUsages, that.volumeUsages) && status == that.status && Objects.equals(causeOfFailure, that.causeOfFailure);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(volumeUsages, status, causeOfFailure);
     }
 }
