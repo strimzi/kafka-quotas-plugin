@@ -55,8 +55,9 @@ The plugin currently provides the following metrics:
 * `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Fetch` shows the currently configured fetch quota
 * `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Request` shows the currently configured request quota
 
-Note: Metrics granularity always matches the quota granularity that the plugin is applying.
-For this reason, the plugin produces aggregated metrics, rather than per-client metrics as with the default Kafka quota plugin.
+NOTE: Only one quota plugin can be used in Kafka.
+Enabling this plugin, the built-in Kafka quotas plugin will be automatically disabled.
+This means that you won't see per-client quota metrics, but only aggregated quota metrics.
 
 ### Additional metrics for cluster wide monitoring
 
