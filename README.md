@@ -55,6 +55,10 @@ The plugin currently provides the following metrics:
 * `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Fetch` shows the currently configured fetch quota
 * `io.strimzi.kafka.quotas:type=StaticQuotaCallback,name=Request` shows the currently configured request quota
 
+NOTE: Only one quota plugin can be used in Kafka.
+Enabling this plugin, the built-in Kafka quotas plugin will be automatically disabled.
+This means that you won't see per-client quota metrics, but only aggregated quota metrics.
+
 ### Additional metrics for cluster wide monitoring
 
 | Name                          | Metric Type | Meaning                                                                        | Type                  | Tags                                          |
@@ -70,6 +74,7 @@ The plugin currently provides the following metrics:
 | LogDirEvictions               | Counter     | The number of times each remoteBroker.logDir has been removed from the cache.  | CachingVolumeObserver | `[observingBrokerId, remoteBrokerId, logDir]` |
 
 ### Tag definitions
+
 | Tag               | Definition                                                             |
 |-------------------|------------------------------------------------------------------------|
 | observingBrokerId | The BrokerId of the broker node executing the plug-in                  |
