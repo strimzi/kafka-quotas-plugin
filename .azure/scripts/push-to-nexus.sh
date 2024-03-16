@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+echo "Build reason: ${BUILD_REASON}"
+echo "Source branch: ${BRANCH}"
+
 export GPG_TTY=$(tty)
 
 echo $GPG_SIGNING_KEY | base64 -d > signing.gpg
