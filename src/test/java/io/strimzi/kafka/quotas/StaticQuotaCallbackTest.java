@@ -89,7 +89,12 @@ class StaticQuotaCallbackTest {
     @Test
     void quotaDefaults() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
-        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", BROKER_ID_PROPERTY, BROKER_ID));
+        target.configure(Map.of(
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                BROKER_ID_PROPERTY, BROKER_ID,
+                // disable the plugin, so we don't need to configure it completely
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 0
+        ));
 
         double produceQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(Double.MAX_VALUE, produceQuotaLimit);
@@ -101,9 +106,13 @@ class StaticQuotaCallbackTest {
     @Test
     void produceQuota() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
-        target.configure(Map.of(StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
+        target.configure(Map.of(
+                StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
                 StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
-                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY));
+                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY,
+                // disable the plugin, so we don't need to configure it completely
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 0
+        ));
 
         double quotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(1024, quotaLimit);
@@ -191,9 +200,15 @@ class StaticQuotaCallbackTest {
     @Test
     void excludedPrincipal() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
-        target.configure(Map.of(StaticQuotaConfig.EXCLUDED_PRINCIPAL_NAME_LIST_PROP, "foo,bar",
+
+        target.configure(Map.of(
+                StaticQuotaConfig.EXCLUDED_PRINCIPAL_NAME_LIST_PROP, "foo,bar",
                 StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                // disable the plugin, so we don't need to configure it completely
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 0
+        ));
+
         double fooQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
         assertEquals(Double.MAX_VALUE, fooQuotaLimit);
 
@@ -224,19 +239,6 @@ class StaticQuotaCallbackTest {
 
         //When
         target.configure(Map.of(StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "0", StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"));
-
-        //Then
-        verify(scheduledExecutorService, times(0)).scheduleWithFixedDelay(any(), anyLong(), anyLong(), any(TimeUnit.class));
-    }
-
-    @Test
-    void shouldNotScheduleStorageCheckWhenCheckIntervalIsNotProvided() {
-        //Given
-        ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
-        StaticQuotaCallback target = new StaticQuotaCallback(volumeSourceBuilder, scheduledExecutorService, Clock.systemUTC());
-
-        //When
-        target.configure(Map.of(StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092", BROKER_ID_PROPERTY, BROKER_ID));
 
         //Then
         verify(scheduledExecutorService, times(0)).scheduleWithFixedDelay(any(), anyLong(), anyLong(), any(TimeUnit.class));
@@ -357,7 +359,9 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.PRODUCE_QUOTA_PROP, 15.0,
                 StaticQuotaConfig.FETCH_QUOTA_PROP, 16.0,
                 StaticQuotaConfig.REQUEST_QUOTA_PROP, 17.0,
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                // disable the plugin, so we don't need to configure it completely
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 0
         ));
 
         SortedMap<MetricName, Metric> group = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
