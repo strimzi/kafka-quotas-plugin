@@ -46,6 +46,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -152,6 +153,21 @@ class StaticQuotaCallbackTest {
         //Then
         double quotaLimit = quotaCallback.quotaLimit(ClientQuotaType.PRODUCE, Map.of());
         assertThat(quotaLimit).isCloseTo(1.0, offset(0.00001d));
+    }
+
+    @Test
+    void configuringCheckIntervalWithNoVolumeLimitsDisablesStorageCheck() {
+        ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
+        StaticQuotaCallback quotaCallback = new StaticQuotaCallback(volumeSourceBuilder, executor, Clock.systemUTC());
+
+        quotaCallback.configure(Map.of(
+                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "10",
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
+                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY
+        ));
+
+        verifyNoInteractions(volumeSourceBuilder);
+        verifyNoInteractions(executor);
     }
 
     @Test
