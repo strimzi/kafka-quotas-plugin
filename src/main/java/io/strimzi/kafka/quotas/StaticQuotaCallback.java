@@ -162,34 +162,13 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         quotaMap = config.getQuotaMap();
         long storageCheckInterval = config.getStorageCheckInterval();
         if (storageCheckInterval > 0L) {
-            LinkedHashMap<String, String> defaultTags = new LinkedHashMap<>();
-            defaultTags.put(HOST_BROKER_TAG, config.getBrokerId());
-
             final Optional<Long> availableBytesLimitConfig = config.getAvailableBytesLimit();
             final Optional<Double> availableRatioLimit = config.getAvailableRatioLimit();
-            if (availableBytesLimitConfig.isPresent() && availableRatioLimit.isPresent()) {
-                String props = String.join(",", StaticQuotaConfig.AVAILABLE_BYTES_PROP, StaticQuotaConfig.AVAILABLE_RATIO_PROP);
-                throw new IllegalStateException("Both limit types configured, only configure one of [" + props + "]");
-            }
-            ThrottleFactorPolicy throttleFactorPolicy;
-            if (availableBytesLimitConfig.isPresent()) {
-                throttleFactorPolicy = new AvailableBytesThrottleFactorPolicy(availableBytesLimitConfig.get());
-                log.info("Available bytes limit {}", availableBytesLimitConfig.get());
-            } else if (availableRatioLimit.isPresent()) {
-                throttleFactorPolicy = new AvailableRatioThrottleFactorPolicy(availableRatioLimit.get());
-                log.info("Available ratio limit {}", availableRatioLimit.get());
+            if (availableBytesLimitConfig.isPresent() || availableRatioLimit.isPresent()) {
+                scheduleStorageCheck(config, availableBytesLimitConfig, availableRatioLimit, storageCheckInterval);
             } else {
-                throw new IllegalStateException("storageCheckInterval > 0 but no limit type configured");
+                log.info("No volume size limits configured, storage check disabled");
             }
-            FixedDurationExpiryPolicy expiryPolicy = new FixedDurationExpiryPolicy(clock, config.getThrottleFactorValidityDuration());
-            final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE), expiryPolicy, config.getFallbackThrottleFactor(), defaultTags);
-            throttleFactorSource = factorNotifier;
-
-            VolumeObserver observer = new CachingVolumeObserver(factorNotifier, clock, config.getThrottleFactorValidityDuration(), defaultTags);
-            Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(observer).withDefaultTags(defaultTags).build();
-            backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckInterval, TimeUnit.SECONDS);
-            backgroundScheduler.scheduleWithFixedDelay(factorNotifier::checkThrottleFactorValidity, 0, 10, TimeUnit.SECONDS);
-            log.info("Configured quota callback with {}. Storage check interval: {}s", quotaMap, storageCheckInterval);
         } else {
             log.info("Static quota callback configured to never check usage: set {} to a positive value to enable", StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP);
         }
@@ -202,6 +181,31 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             String name = clientQuotaType.name().toUpperCase(ENGLISH).charAt(0) + clientQuotaType.name().toLowerCase(ENGLISH).substring(1);
             Metrics.newGauge(metricName(StaticQuotaCallback.class, name), new ClientQuotaGauge(quota));
         });
+    }
+
+    private void scheduleStorageCheck(StaticQuotaConfig config, Optional<Long> availableBytesLimitConfig, Optional<Double> availableRatioLimit, long storageCheckInterval) {
+        LinkedHashMap<String, String> defaultTags = new LinkedHashMap<>();
+        defaultTags.put(HOST_BROKER_TAG, config.getBrokerId());
+        if (availableBytesLimitConfig.isPresent() && availableRatioLimit.isPresent()) {
+            String props = String.join(",", StaticQuotaConfig.AVAILABLE_BYTES_PROP, StaticQuotaConfig.AVAILABLE_RATIO_PROP);
+            throw new IllegalStateException("Both limit types configured, only configure one of [" + props + "]");
+        }
+        ThrottleFactorPolicy throttleFactorPolicy;
+        if (availableBytesLimitConfig.isPresent()) {
+            throttleFactorPolicy = new AvailableBytesThrottleFactorPolicy(availableBytesLimitConfig.get());
+            log.info("Available bytes limit {}", availableBytesLimitConfig.get());
+        } else {
+            throttleFactorPolicy = new AvailableRatioThrottleFactorPolicy(availableRatioLimit.get());
+            log.info("Available ratio limit {}", availableRatioLimit.get());
+        }
+        FixedDurationExpiryPolicy expiryPolicy = new FixedDurationExpiryPolicy(clock, config.getThrottleFactorValidityDuration());
+        final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE), expiryPolicy, config.getFallbackThrottleFactor(), defaultTags);
+        throttleFactorSource = factorNotifier;
+        VolumeObserver observer = new CachingVolumeObserver(factorNotifier, clock, config.getThrottleFactorValidityDuration(), defaultTags);
+        Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(observer).withDefaultTags(defaultTags).build();
+        backgroundScheduler.scheduleWithFixedDelay(volumeSource, 0, storageCheckInterval, TimeUnit.SECONDS);
+        backgroundScheduler.scheduleWithFixedDelay(factorNotifier::checkThrottleFactorValidity, 0, 10, TimeUnit.SECONDS);
+        log.info("Configured quota callback with {}. Storage check interval: {}s", quotaMap, storageCheckInterval);
     }
 
     private void closeExecutorService() {
