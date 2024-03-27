@@ -42,6 +42,7 @@ client.quota.callback.static.kafka.admin.ssl.truststore.location=/tmp/trust.jks 
 client.quota.callback.static.storage.per.volume.limit.min.available.bytes=5368709120
 
 # Check storage usage every 5 seconds
+# By default set to 60 seconds
 client.quota.callback.static.storage.check-interval=5
 
 # Optional list of principals not to be subjected to the quota

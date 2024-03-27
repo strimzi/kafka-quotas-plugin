@@ -49,6 +49,8 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String FALLBACK_THROTTLE_FACTOR_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".throttle.factor.fallback";
     static final String THROTTLE_FALLBACK_VALIDITY_DURATION_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".throttle.factor.validity.duration";
     static final String ADMIN_BOOTSTRAP_SERVER_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.bootstrap.servers";
+    static final int STORAGE_CHECK_INTERVAL_DEFAULT = 60;
+
     private final KafkaClientConfig kafkaClientConfig;
     private final boolean supportsKip827;
 
@@ -75,7 +77,7 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(FETCH_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Consume bandwidth rate quota (in bytes)")
                         .define(REQUEST_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Request processing time quota (in seconds)")
                         .define(EXCLUDED_PRINCIPAL_NAME_LIST_PROP, LIST, List.of(), MEDIUM, "List of principals that are excluded from the quota")
-                        .define(STORAGE_CHECK_INTERVAL_PROP, INT, 0, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
+                        .define(STORAGE_CHECK_INTERVAL_PROP, INT, STORAGE_CHECK_INTERVAL_DEFAULT, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
                         .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrInRangeValidator(atLeast(0)), MEDIUM, "Stop message production if availableBytes <= this value")
                         .define(AVAILABLE_RATIO_PROP, DOUBLE, null, nullOrInRangeValidator(between(0.0, 1.0)), MEDIUM, "Stop message production if availableBytes / capacityBytes <= this value")
                         .define(THROTTLE_FALLBACK_VALIDITY_DURATION_PROP, STRING, "PT5M", iso8601DurationValidator(), MEDIUM, "How long a throttle factor derived from a successful observation of the cluster should be applied (iso8601 duration)")
