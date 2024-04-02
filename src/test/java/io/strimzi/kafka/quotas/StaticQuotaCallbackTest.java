@@ -91,9 +91,7 @@ class StaticQuotaCallbackTest {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
         target.configure(Map.of(
                 StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
-                BROKER_ID_PROPERTY, BROKER_ID,
-                // disable the plugin, so we don't need to configure it completely
-                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 0
+                BROKER_ID_PROPERTY, BROKER_ID
         ));
 
         double produceQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
@@ -109,9 +107,7 @@ class StaticQuotaCallbackTest {
         target.configure(Map.of(
                 StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
                 StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
-                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY,
-                // disable the plugin, so we don't need to configure it completely
-                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 0
+                BROKER_ID_PROPERTY, BROKER_ID_PROPERTY
         ));
 
         double quotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
@@ -204,9 +200,7 @@ class StaticQuotaCallbackTest {
         target.configure(Map.of(
                 StaticQuotaConfig.EXCLUDED_PRINCIPAL_NAME_LIST_PROP, "foo,bar",
                 StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
-                // disable the plugin, so we don't need to configure it completely
-                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 0
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
         ));
 
         double fooQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, foo, "clientId"));
@@ -359,9 +353,7 @@ class StaticQuotaCallbackTest {
                 StaticQuotaConfig.PRODUCE_QUOTA_PROP, 15.0,
                 StaticQuotaConfig.FETCH_QUOTA_PROP, 16.0,
                 StaticQuotaConfig.REQUEST_QUOTA_PROP, 17.0,
-                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092",
-                // disable the plugin, so we don't need to configure it completely
-                StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, 0
+                StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
         ));
 
         SortedMap<MetricName, Metric> group = getMetricGroup(METRICS_SCOPE, METRICS_TYPE);
