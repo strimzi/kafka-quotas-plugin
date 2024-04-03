@@ -42,11 +42,29 @@ client.quota.callback.static.kafka.admin.ssl.truststore.location=/tmp/trust.jks 
 client.quota.callback.static.storage.per.volume.limit.min.available.bytes=5368709120
 
 # Check storage usage every 5 seconds
+# By default set to 60 seconds
 client.quota.callback.static.storage.check-interval=5
 
 # Optional list of principals not to be subjected to the quota
 client.quota.callback.static.excluded.principal.name.list=principal1,principal2
 ```
+
+### Properties and their defaults
+
+| Property                                                                  | Type    | Default                 | Description                                                                                                                                                                   |
+|---------------------------------------------------------------------------|---------|-------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| client.quota.callback.static.produce                                      | Double  | 1.7976931348623157e+308 | Produce bandwidth rate quota (in bytes)                                                                                                                                       |
+| client.quota.callback.static.fetch                                        | Double  | 1.7976931348623157e+308 | Consume bandwidth rate quota (in bytes)                                                                                                                                       |
+| client.quota.callback.static.request                                      | Double  | 1.7976931348623157e+308 | Request processing time quota (in seconds)                                                                                                                                    |
+| client.quota.callback.static.excluded.principal.name.list                 | List    | []                      | List of principals that are excluded from the quota                                                                                                                           |
+| client.quota.callback.static.storage.check-interval                       | Integer | 60                      | Interval between storage check runs (in seconds, a value of 0 means disabled)                                                                                                  |
+| client.quota.callback.static.storage.per.volume.limit.min.available.bytes | Long    | None                    | Stop message production if availableBytes <= this value. Mutually exclusive with `client.quota.callback.static.storage.per.volume.limit.min.available.ratio`.                 |
+| client.quota.callback.static.storage.per.volume.limit.min.available.ratio | Double  | None                    | Stop message production if availableBytes / capacityBytes <= this value. Mutually exclusive with `client.quota.callback.static.storage.per.volume.limit.min.available.bytes`. |
+| client.quota.callback.static.throttle.factor.fallback                     | Double  | 1.0                     | Fallback throttle factor to apply, in the range `0..1` if current factor expires. Applied by multiplying the factor against `client.quota.callback.static.produce` thus `0.0` effectively blocks producers. |
+| client.quota.callback.static.throttle.factor.validity.duration            | String  | PT5M                    | How long a throttle factor derived from a successful observation of the cluster should be applied (iso8601 duration)                                                          |
+| client.quota.callback.static.kafka.admin.bootstrap.servers                | String  | None                    | Bootstrap servers of Kafka cluster. This property is **required**, otherwise the Kafka broker will fail to start.                                                             |
+
+All configuration properties starting with `client.quota.callback.static.kafka.admin.` prefix will be passed to the Kafka Admin client configuration.
 
 ## Metrics
 
