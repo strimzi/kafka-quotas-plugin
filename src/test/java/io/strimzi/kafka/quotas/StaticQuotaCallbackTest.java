@@ -198,7 +198,7 @@ class StaticQuotaCallbackTest {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
 
         target.configure(Map.of(
-                StaticQuotaConfig.EXCLUDED_PRINCIPAL_NAME_LIST_PROP, "foo,bar",
+                StaticQuotaConfig.EXCLUDED_PRINCIPAL_NAME_LIST_PROP, "foo;bar;CN=my-cluster,O=io.strimzi",
                 StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
                 StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
         ));
@@ -209,6 +209,10 @@ class StaticQuotaCallbackTest {
         KafkaPrincipal baz = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "baz");
         double bazQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, baz, "clientId"));
         assertEquals(1024, bazQuotaLimit);
+
+        KafkaPrincipal disName = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "CN=my-cluster,O=io.strimzi");
+        double disQuotaLimit = target.quotaLimit(ClientQuotaType.PRODUCE, target.quotaMetricTags(ClientQuotaType.PRODUCE, disName, "clientId"));
+        assertEquals(Double.MAX_VALUE, disQuotaLimit);
     }
 
     @Test
