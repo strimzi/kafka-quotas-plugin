@@ -8,7 +8,6 @@ import java.time.Clock;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -57,7 +56,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     private final Clock clock;
 
     private volatile Map<ClientQuotaType, Quota> quotaMap = new HashMap<>();
-    private volatile List<String> excludedPrincipalNameList = List.of();
+    private volatile Set<String> excludedPrincipalNameList = Set.of();
     private final Set<ClientQuotaType> resetQuota = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private volatile ThrottleFactorSource throttleFactorSource = UnlimitedThrottleFactorSource.UNLIMITED_THROTTLE_FACTOR_SOURCE;
     private final VolumeSourceBuilder volumeSourceBuilder;

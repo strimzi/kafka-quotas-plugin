@@ -6,13 +6,12 @@ package io.strimzi.kafka.quotas;
 
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -78,7 +77,7 @@ public class StaticQuotaConfig extends AbstractConfig {
                         .define(PRODUCE_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Produce bandwidth rate quota (in bytes)")
                         .define(FETCH_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Consume bandwidth rate quota (in bytes)")
                         .define(REQUEST_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Request processing time quota (in seconds)")
-                        .define(EXCLUDED_PRINCIPAL_NAME_LIST_PROP, STRING, "", MEDIUM, "List of principals that are excluded from the quota")
+                        .define(EXCLUDED_PRINCIPAL_NAME_LIST_PROP, STRING, null, MEDIUM, "List of principals that are excluded from the quota")
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, STORAGE_CHECK_INTERVAL_DEFAULT, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
                         .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrInRangeValidator(atLeast(0)), MEDIUM, "Stop message production if availableBytes <= this value")
                         .define(AVAILABLE_RATIO_PROP, DOUBLE, null, nullOrInRangeValidator(between(0.0, 1.0)), MEDIUM, "Stop message production if availableBytes / capacityBytes <= this value")
@@ -124,8 +123,9 @@ public class StaticQuotaConfig extends AbstractConfig {
         return getInt(STORAGE_CHECK_INTERVAL_PROP);
     }
 
-    List<String> getExcludedPrincipalNameList() {
-        return Arrays.stream(getString(EXCLUDED_PRINCIPAL_NAME_LIST_PROP).split(";")).collect(Collectors.toList());
+    Set<String> getExcludedPrincipalNameList() {
+        String excludedPrincipals = getString(EXCLUDED_PRINCIPAL_NAME_LIST_PROP);
+        return excludedPrincipals != null ? Set.of(excludedPrincipals.split(";")) : Set.of();
     }
 
     KafkaClientConfig getKafkaClientConfig() {
