@@ -171,7 +171,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
         } else {
             log.info("Static quota callback configured to never check usage: set {} to a positive value to enable", StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP);
         }
-        excludedPrincipalNameList = config.getExcludedPrincipalNameList();
+        excludedPrincipalNameList = config.getSetOfExcludedPrincipals();
         if (!excludedPrincipalNameList.isEmpty()) {
             log.info("Excluded principals {}", excludedPrincipalNameList);
         }

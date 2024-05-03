@@ -7,6 +7,7 @@ package io.strimzi.kafka.quotas;
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,6 +21,7 @@ import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.metrics.Quota;
+import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.apache.kafka.server.quota.ClientQuotaType;
 import org.slf4j.Logger;
 
@@ -123,9 +125,23 @@ public class StaticQuotaConfig extends AbstractConfig {
         return getInt(STORAGE_CHECK_INTERVAL_PROP);
     }
 
-    Set<String> getExcludedPrincipalNameList() {
+    Set<String> getSetOfExcludedPrincipals() {
+        Set<String> setOfExcludedPrincipals = new HashSet<>();
         String excludedPrincipals = getString(EXCLUDED_PRINCIPAL_NAME_LIST_PROP);
-        return excludedPrincipals != null ? Set.of(excludedPrincipals.split(";")) : Set.of();
+
+        if (excludedPrincipals != null) {
+            for (String excludedPrincipal : excludedPrincipals.split(";")) {
+                String[] split = excludedPrincipal.split(KafkaPrincipal.USER_TYPE + ":");
+
+                // in case that the excluded principal contains the `User:` prefix before its name, we can add it to the set
+                if (split.length == 2) {
+                    // get the principal name after `User:` prefix
+                    setOfExcludedPrincipals.add(split[1]);
+                }
+            }
+        }
+
+        return setOfExcludedPrincipals;
     }
 
     KafkaClientConfig getKafkaClientConfig() {
