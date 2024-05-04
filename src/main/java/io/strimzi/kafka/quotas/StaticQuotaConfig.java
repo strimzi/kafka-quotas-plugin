@@ -133,10 +133,12 @@ public class StaticQuotaConfig extends AbstractConfig {
             for (String excludedPrincipal : excludedPrincipals.split(";")) {
                 String[] split = excludedPrincipal.split(KafkaPrincipal.USER_TYPE + ":");
 
-                // in case that the excluded principal contains the `User:` prefix before its name, we can add it to the set
+                // in case that the excluded principal contains the `User:` prefix before its name, we will add it to the set
                 if (split.length == 2) {
                     // get the principal name after `User:` prefix
                     setOfExcludedPrincipals.add(split[1]);
+                } else {
+                    throw new ConfigException(String.format("Invalid excluded principal configuration for \"%s\" - missing User: prefix", excludedPrincipal));
                 }
             }
         }

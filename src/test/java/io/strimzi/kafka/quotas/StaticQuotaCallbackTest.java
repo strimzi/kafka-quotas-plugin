@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.yammer.metrics.core.Metric;
 import com.yammer.metrics.core.MetricName;
+import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.apache.kafka.server.quota.ClientQuotaType;
 import org.junit.jupiter.api.AfterEach;
@@ -197,8 +198,15 @@ class StaticQuotaCallbackTest {
     void excludedPrincipal() {
         KafkaPrincipal foo = new KafkaPrincipal(KafkaPrincipal.USER_TYPE, "foo");
 
+        // check that specifying principal without User: prefix will throw an exception
+        assertThrows(ConfigException.class, () -> target.configure(Map.of(
+            StaticQuotaConfig.EXCLUDED_PRINCIPAL_NAME_LIST_PROP, "User:foo;User:bar;User:CN=my-cluster,O=io.strimzi;arnost",
+            StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
+            StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
+        )));
+
         target.configure(Map.of(
-                StaticQuotaConfig.EXCLUDED_PRINCIPAL_NAME_LIST_PROP, "User:foo;User:bar;User:CN=my-cluster,O=io.strimzi;arnost",
+                StaticQuotaConfig.EXCLUDED_PRINCIPAL_NAME_LIST_PROP, "User:foo;User:bar;User:CN=my-cluster,O=io.strimzi",
                 StaticQuotaConfig.PRODUCE_QUOTA_PROP, 1024,
                 StaticQuotaConfig.ADMIN_BOOTSTRAP_SERVER_PROP, "localhost:9092"
         ));
