@@ -71,6 +71,24 @@
             <organization>Red Hat</organization>
             <organizationUrl>https://www.redhat.com</organizationUrl>
         </developer>
+        <developer>
+            <name>Paul Mellor</name>
+            <email>pmellor@redhat.com</email>
+            <organization>Red Hat</organization>
+            <organizationUrl>https://www.redhat.com</organizationUrl>
+        </developer>
+        <developer>
+            <name>Lukáš Král</name>
+            <email>l.kral@outlook.com</email>
+            <organization>Red Hat</organization>
+            <organizationUrl>https://www.redhat.com</organizationUrl>
+        </developer>
+        <developer>
+            <name>Maroš Orsák</name>
+            <email>maros.orsak159@gmail.com</email>
+            <organization>Red Hat</organization>
+            <organizationUrl>https://www.redhat.com</organizationUrl>
+        </developer>
     </developers>
 
     <properties>
@@ -90,7 +108,7 @@
         <checkstyle.version>9.2.1</checkstyle.version>
         <maven.spotbugs.version>4.5.3.0</maven.spotbugs.version>
         <spotbugs.version>4.7.2</spotbugs.version>
-        <sonatype.nexus.staging>1.6.3</sonatype.nexus.staging>
+        <sonatype.nexus.staging>1.7.0</sonatype.nexus.staging>
         <jacoco.version>0.7.9</jacoco.version>
         <license.maven.version>2.11</license.maven.version>
         <maven-jar-plugin.version>3.1.0</maven-jar-plugin.version>
