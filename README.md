@@ -17,9 +17,9 @@ For example, if you have configured a produce quota of 40 MB/second, and you hav
 The quota distribution across clients is not static. 
 If you have a max of 40 MB/second, 2 producers, and one of them is producing messages at 10 MB/second, the second producer will be throttled at 30 MB/second.
 
-## Using with Strimzi
+## Using with Strimzi-based Apache Kafka clusters
 
-**Warning: this version is not included in Strimzi yet, see tag [0.2.0](https://github.com/strimzi/kafka-quotas-plugin/tree/0.2.0)** for current Strimzi-compatible docs.
+When using the Strimzi Quotas plugin with Strimzi-based Apache Kafka clusters, please follow the [Strimzi documentation](https://strimzi.io/docs/operators/latest/full/deploying.html#proc-setting-broker-limits-str) to configure the plugin.
 
 ## Using with other Apache Kafka clusters 
 
