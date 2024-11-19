@@ -114,7 +114,7 @@
         <maven-jar-plugin.version>3.1.0</maven-jar-plugin.version>
         <maven.enforced.version>3.0.0-M2</maven.enforced.version>
 
-        <kafka.version>3.7.0</kafka.version>
+        <kafka.version>3.7.1</kafka.version>
         <slf4j.version>1.7.36</slf4j.version>
         <yammer-metrics.version>2.2.0</yammer-metrics.version>
         <junit.version>5.7.2</junit.version>
