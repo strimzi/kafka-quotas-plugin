@@ -114,7 +114,7 @@
         <checkstyle.version>9.2.1</checkstyle.version>
         <maven.spotbugs.version>4.5.3.0</maven.spotbugs.version>
         <spotbugs.version>4.7.2</spotbugs.version>
-        <sonatype.nexus.staging>1.7.0</sonatype.nexus.staging>
+        <central-publishing-maven-plugin.version>0.7.0</central-publishing-maven-plugin.version>
         <jacoco.version>0.7.9</jacoco.version>
         <license.maven.version>2.11</license.maven.version>
         <maven-jar-plugin.version>3.1.0</maven-jar-plugin.version>
@@ -130,17 +130,6 @@
         <!-- property to skip surefire tests during failsafe execution -->
         <skip.surefire.tests>${skipTests}</skip.surefire.tests>
     </properties>
-
-    <distributionManagement>
-        <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
-        <repository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
-    </distributionManagement>
 
     <dependencyManagement>
         <dependencies>
@@ -468,7 +457,7 @@
     </build>
     <profiles>
         <profile>
-            <id>ossrh</id>
+            <id>central</id>
             <activation>
                 <activeByDefault>false</activeByDefault>
             </activation>
@@ -502,14 +491,12 @@
                         </executions>
                     </plugin>
                     <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <version>${sonatype.nexus.staging}</version>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>${central-publishing-maven-plugin.version}</version>
                         <extensions>true</extensions>
                         <configuration>
-                            <serverId>ossrh</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                            <autoReleaseAfterClose>false</autoReleaseAfterClose>
+                            <publishingServerId>central</publishingServerId>
                         </configuration>
                     </plugin>
                 </plugins>
