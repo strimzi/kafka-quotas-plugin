@@ -125,7 +125,7 @@
         <yammer-metrics.version>2.2.0</yammer-metrics.version>
         <junit.version>5.13.1</junit.version>
         <mockito.version>5.18.0</mockito.version>
-        <assertj.version>3.22.0</assertj.version>
+        <assertj.version>3.27.7</assertj.version>
 
         <!-- property to skip surefire tests during failsafe execution -->
         <skip.surefire.tests>${skipTests}</skip.surefire.tests>
