@@ -1,5 +1,5 @@
-name: "Build Kafka-Access-Operator Binaries"
-description: "Build and archive kafka-access-operator binaries"
+name: "Build Kafka-Quotas-Plugin Binaries"
+description: "Build and archive kafka-quotas-plugin binaries"
 
 inputs:
   javaVersion:

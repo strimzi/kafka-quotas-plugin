@@ -27,8 +27,3 @@ jobs:
           gpgSigningKey: ${{ secrets.GPG_SIGNING_KEY }}
           centralUsername: ${{ secrets.CENTRAL_USERNAME }}
           centralPassword: ${{ secrets.CENTRAL_PASSWORD }}
-
-
-
-
-
