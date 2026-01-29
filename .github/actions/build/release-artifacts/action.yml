@@ -65,9 +65,9 @@ runs:
       shell: bash
       run: |
         tar -cvpf release.tar \
-          kafka-kubernetes-config-provider-${{ inputs.releaseVersion }}.tar.gz \
-          kafka-kubernetes-config-provider-${{ inputs.releaseVersion }}.zip \
-          kafka-kubernetes-config-provider-${{ inputs.releaseVersion }}.jar
+          kafka-quotas-plugin-${{ inputs.releaseVersion }}.tar.gz \
+          kafka-quotas-plugin-${{ inputs.releaseVersion }}.zip \
+          kafka-quotas-plugin-${{ inputs.releaseVersion }}.jar
 
     - name: Upload release archives
       uses: actions/upload-artifact@v5
