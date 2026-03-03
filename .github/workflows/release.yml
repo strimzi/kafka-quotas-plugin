@@ -25,11 +25,6 @@ jobs:
         with:
           javaVersion: "17"
 
-      - name: Install yq
-        uses: strimzi/github-actions/.github/actions/dependencies/install-yq@main
-        with:
-          version: "v4.6.3"
-
       - name: Prepare release artifacts
         uses: strimzi/github-actions/.github/actions/build/release-artifacts@main
         with:
