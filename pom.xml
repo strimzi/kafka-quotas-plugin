@@ -204,7 +204,6 @@
     </dependencies>
 
     <build>
-        <finalName>kafka-quotas-plugin</finalName>
         <pluginManagement>
             <plugins>
                 <plugin>
