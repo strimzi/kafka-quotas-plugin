@@ -66,6 +66,22 @@ client.quota.callback.static.excluded.principal.name.list=User:principal1;User:p
 
 All configuration properties starting with `client.quota.callback.static.kafka.admin.` prefix will be passed to the Kafka Admin client configuration.
 
+## Changing the quotas at runtime
+
+`client.quota.callback.static.produce`, `.fetch` and `.request` can be changed without a restart through dynamic broker configuration, for the whole cluster or for one broker (`--entity-name <broker-id>`):
+
+```
+bin/kafka-configs.sh --bootstrap-server localhost:9092 --entity-type brokers --entity-default --alter --add-config client.quota.callback.static.produce=50000000
+```
+
+A per-broker value overrides the cluster default, which overrides the properties file (on Strimzi, `spec.kafka.quotas`); `--delete-config` goes back to the next one.
+A value that is not a number is rejected. `0`, negative and non-finite values limit clients to 1 byte per second, so do not set them.
+A client that is already throttled keeps its delay: raising the quota does not shorten it.
+The other plugin properties still need a restart.
+
+Earlier versions ignored these dynamic values, so before upgrading check for stored ones (`kafka-configs.sh --entity-type brokers --entity-default --describe`, and per broker): they take effect after the upgrade, and one that is not a number stops the broker applying dynamic configuration.
+Change the quotas at runtime only once all brokers run this version.
+
 ## Metrics
 
 The plugin currently provides the following metrics:
