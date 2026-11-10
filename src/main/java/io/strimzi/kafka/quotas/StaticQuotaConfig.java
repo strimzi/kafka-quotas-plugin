@@ -53,6 +53,10 @@ public class StaticQuotaConfig extends AbstractConfig {
     static final String THROTTLE_FALLBACK_VALIDITY_DURATION_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".throttle.factor.validity.duration";
     static final String ADMIN_BOOTSTRAP_SERVER_PROP = CLIENT_QUOTA_CALLBACK_STATIC_PREFIX + ".kafka.admin.bootstrap.servers";
     static final int STORAGE_CHECK_INTERVAL_DEFAULT = 60;
+    static final Map<ClientQuotaType, String> QUOTA_PROPS = Map.of(
+            ClientQuotaType.PRODUCE, PRODUCE_QUOTA_PROP,
+            ClientQuotaType.FETCH, FETCH_QUOTA_PROP,
+            ClientQuotaType.REQUEST, REQUEST_QUOTA_PROP);
 
     private final KafkaClientConfig kafkaClientConfig;
     private final boolean supportsKip827;
@@ -75,10 +79,7 @@ public class StaticQuotaConfig extends AbstractConfig {
      * @param supportsKip827 whether the broker this plugin is running in has volume usage information, see KIP-827
      */
     /* test */ StaticQuotaConfig(Map<String, ?> props, boolean doLog, boolean supportsKip827) {
-        super(new ConfigDef()
-                        .define(PRODUCE_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Produce bandwidth rate quota (in bytes)")
-                        .define(FETCH_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Consume bandwidth rate quota (in bytes)")
-                        .define(REQUEST_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Request processing time quota (in seconds)")
+        super(quotaLimitDefinitions()
                         .define(EXCLUDED_PRINCIPAL_NAME_LIST_PROP, STRING, null, MEDIUM, "List of principals that are excluded from the quota")
                         .define(STORAGE_CHECK_INTERVAL_PROP, INT, STORAGE_CHECK_INTERVAL_DEFAULT, MEDIUM, "Interval between storage check runs (in seconds, default of 0 means disabled")
                         .define(AVAILABLE_BYTES_PROP, LONG, null, nullOrInRangeValidator(atLeast(0)), MEDIUM, "Stop message production if availableBytes <= this value")
@@ -91,6 +92,13 @@ public class StaticQuotaConfig extends AbstractConfig {
         kafkaClientConfig = new KafkaClientConfig(props, doLog);
     }
 
+    private static ConfigDef quotaLimitDefinitions() {
+        return new ConfigDef()
+                .define(PRODUCE_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Produce bandwidth rate quota (in bytes)")
+                .define(FETCH_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Consume bandwidth rate quota (in bytes)")
+                .define(REQUEST_QUOTA_PROP, DOUBLE, Double.MAX_VALUE, HIGH, "Request processing time quota (in seconds)");
+    }
+
     private static boolean testForKip827() {
         try {
             LogDirDescription.class.getDeclaredMethod("totalBytes");
@@ -101,15 +109,24 @@ public class StaticQuotaConfig extends AbstractConfig {
     }
 
     Map<ClientQuotaType, Quota> getQuotaMap() {
+        return toQuotaMap(values());
+    }
+
+    /**
+     * Parses the quota limits alone, ignoring every other key, so that a dynamic change to a limit does not depend on
+     * the rest of the plugin configuration. A missing limit takes its default.
+     *
+     * @param props the configuration properties
+     * @return the quota limit of each quota type
+     * @throws ConfigException if a limit is not a valid double
+     */
+    static Map<ClientQuotaType, Quota> parseQuotaMap(Map<String, ?> props) {
+        return toQuotaMap(quotaLimitDefinitions().parse(props));
+    }
+
+    private static Map<ClientQuotaType, Quota> toQuotaMap(Map<String, ?> values) {
         Map<ClientQuotaType, Quota> m = new HashMap<>();
-        Double produceBound = getDouble(PRODUCE_QUOTA_PROP);
-        Double fetchBound = getDouble(FETCH_QUOTA_PROP);
-        Double requestBound = getDouble(REQUEST_QUOTA_PROP);
-
-        m.put(ClientQuotaType.PRODUCE, Quota.upperBound(produceBound));
-        m.put(ClientQuotaType.FETCH, Quota.upperBound(fetchBound));
-        m.put(ClientQuotaType.REQUEST, Quota.upperBound(requestBound));
-
+        QUOTA_PROPS.forEach((quotaType, prop) -> m.put(quotaType, Quota.upperBound((Double) values.get(prop))));
         return m;
     }
 
