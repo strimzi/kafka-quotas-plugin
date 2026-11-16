@@ -43,7 +43,5 @@ jobs:
       javaVersion: "17"
       helmChartName: "none"
       releaseVersion: "6.6.6"
-      helmVersion: "v3.20.0"
-      helmUnitTestVersion: "v1.0.3"
       imagesLocation: "none"
     secrets: inherit
