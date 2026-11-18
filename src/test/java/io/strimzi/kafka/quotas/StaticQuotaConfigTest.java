@@ -11,6 +11,8 @@ import java.util.Map;
 
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.common.config.ConfigException;
+import org.apache.kafka.common.metrics.Quota;
+import org.apache.kafka.server.quota.ClientQuotaType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -147,6 +149,21 @@ class StaticQuotaConfigTest {
         //Then
         assertThat(config.getThrottleFactorValidityDuration()).isEqualTo(Duration.ofMinutes(5));
         assertThat(config.getFallbackThrottleFactor()).isEqualTo(1.0d);
+    }
+
+    @Test
+    void parseQuotaMapReadsOnlyQuotaLimits() {
+        //Given no admin bootstrap servers and an invalid value for a key that is not a quota limit
+        Map<String, String> props = Map.of(StaticQuotaConfig.PRODUCE_QUOTA_PROP, "2048", StaticQuotaConfig.STORAGE_CHECK_INTERVAL_PROP, "not-a-number");
+
+        //When
+        Map<ClientQuotaType, Quota> quotaMap = StaticQuotaConfig.parseQuotaMap(props);
+
+        //Then
+        assertThat(quotaMap)
+                .containsEntry(ClientQuotaType.PRODUCE, Quota.upperBound(2048))
+                .containsEntry(ClientQuotaType.FETCH, Quota.upperBound(Double.MAX_VALUE))
+                .containsEntry(ClientQuotaType.REQUEST, Quota.upperBound(Double.MAX_VALUE));
     }
 
     @Test

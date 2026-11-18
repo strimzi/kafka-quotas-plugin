@@ -5,16 +5,17 @@
 package io.strimzi.kafka.quotas;
 
 import java.time.Clock;
-import java.util.Collections;
+import java.time.Duration;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import com.yammer.metrics.Metrics;
@@ -29,6 +30,7 @@ import io.strimzi.kafka.quotas.throttle.ThrottleFactorPolicy;
 import io.strimzi.kafka.quotas.throttle.ThrottleFactorSource;
 import io.strimzi.kafka.quotas.throttle.UnlimitedThrottleFactorSource;
 import org.apache.kafka.common.Cluster;
+import org.apache.kafka.common.Reconfigurable;
 import org.apache.kafka.common.metrics.Quota;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.apache.kafka.server.quota.ClientQuotaCallback;
@@ -41,8 +43,9 @@ import static java.util.Locale.ENGLISH;
 
 /**
  * Allows configuring generic quotas for a broker independent of users and clients.
+ * The produce, fetch and request quotas can be changed at runtime through dynamic broker configuration.
  */
-public class StaticQuotaCallback implements ClientQuotaCallback {
+public class StaticQuotaCallback implements ClientQuotaCallback, Reconfigurable {
     /**
      * Tag used for metrics to identify the broker which generated the observation.
      */
@@ -53,11 +56,20 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
     public static final String LOG_DIR_TAG = "logDir";
     private static final Logger log = LoggerFactory.getLogger(StaticQuotaCallback.class);
     private static final String EXCLUDED_PRINCIPAL_QUOTA_KEY = "excluded-principal-quota-key";
+    /**
+     * How long after Kafka first reads a quota change it is asked to read it once more.
+     */
+    static final Duration RESET_REPEAT_DELAY = Duration.ofSeconds(1);
+    // States of a quota reset: nothing to report, report a change now and once more after RESET_REPEAT_DELAY, or report
+    // on the next call only (the initial state). Any other value is the time, in epoch milliseconds, of the repeat.
+    private static final long NO_RESET = Long.MAX_VALUE;
+    private static final long RESET_REQUIRED = Long.MAX_VALUE - 1;
+    private static final long RESET_ONCE = Long.MIN_VALUE;
     private final Clock clock;
 
     private volatile Map<ClientQuotaType, Quota> quotaMap = new HashMap<>();
     private volatile Set<String> excludedPrincipalNameList = Set.of();
-    private final Set<ClientQuotaType> resetQuota = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Map<ClientQuotaType, AtomicLong> quotaResets = new EnumMap<>(ClientQuotaType.class);
     private volatile ThrottleFactorSource throttleFactorSource = UnlimitedThrottleFactorSource.UNLIMITED_THROTTLE_FACTOR_SOURCE;
     private final VolumeSourceBuilder volumeSourceBuilder;
     private static final String SCOPE = "io.strimzi.kafka.quotas.StaticQuotaCallback";
@@ -97,7 +109,9 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
                                  Clock clock) {
         this.volumeSourceBuilder = volumeSourceBuilder;
         this.backgroundScheduler = backgroundScheduler;
-        Collections.addAll(resetQuota, ClientQuotaType.values());
+        for (ClientQuotaType quotaType : ClientQuotaType.values()) {
+            quotaResets.put(quotaType, new AtomicLong(RESET_ONCE));
+        }
         this.clock = clock;
     }
 
@@ -121,7 +135,11 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             ThrottleFactor factor = throttleFactorSource.currentThrottleFactor();
             quota = quota * factor.getThrottleFactor();
         }
-        // returning zero would cause a divide by zero in Kafka, so we return 1 at minimum
+        // returning zero would cause a divide by zero in Kafka, so we return 1 at minimum. A bound that is not finite
+        // (NaN, or Infinity, also times a throttle factor of 0) would stop Kafka from throttling at all, so it gets 1 too.
+        if (!Double.isFinite(quota)) {
+            return 1d;
+        }
         return Math.max(quota, 1d);
     }
 
@@ -137,7 +155,22 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
 
     @Override
     public boolean quotaResetRequired(ClientQuotaType quotaType) {
-        return resetQuota.remove(quotaType);
+        AtomicLong reset = quotaResets.get(quotaType);
+        long state = reset.get();
+        if (state == NO_RESET) {
+            return false;
+        }
+        long now = clock.millis();
+        if (state == RESET_REQUIRED) {
+            // Kafka does not serialise its quota refreshes: a request thread that read the old quotas can install them
+            // after another thread installed the new ones. Reporting the change once more, later, narrows that window but cannot close it.
+            return reset.compareAndSet(RESET_REQUIRED, now + RESET_REPEAT_DELAY.toMillis());
+        }
+        return now >= state && reset.compareAndSet(state, NO_RESET);
+    }
+
+    private void requireQuotaReset(ClientQuotaType quotaType) {
+        quotaResets.get(quotaType).set(RESET_REQUIRED);
     }
 
     @Override
@@ -176,10 +209,38 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             log.info("Excluded principals {}", excludedPrincipalNameList);
         }
 
-        quotaMap.forEach((clientQuotaType, quota) -> {
+        quotaMap.keySet().forEach(clientQuotaType -> {
             String name = clientQuotaType.name().toUpperCase(ENGLISH).charAt(0) + clientQuotaType.name().toLowerCase(ENGLISH).substring(1);
-            Metrics.newGauge(metricName(StaticQuotaCallback.class, name), new ClientQuotaGauge(quota));
+            Metrics.newGauge(metricName(StaticQuotaCallback.class, name), new ClientQuotaGauge(clientQuotaType));
         });
+    }
+
+    @Override
+    public Set<String> reconfigurableConfigs() {
+        return Set.copyOf(StaticQuotaConfig.QUOTA_PROPS.values());
+    }
+
+    @Override
+    public void validateReconfiguration(Map<String, ?> configs) {
+        // Only the parsing of the properties file. Kafka passes the broker's whole configuration, properties file included,
+        // and every broker applies the change, so any further check could reject it on one broker only, and that broker
+        // would stop applying dynamic configuration. Values that parse but make no sense get the minimum in quotaLimit().
+        StaticQuotaConfig.parseQuotaMap(configs);
+    }
+
+    @Override
+    public void reconfigure(Map<String, ?> configs) {
+        Map<ClientQuotaType, Quota> newQuotaMap = StaticQuotaConfig.parseQuotaMap(configs);
+        Map<ClientQuotaType, Quota> oldQuotaMap = quotaMap;
+        // Swap in a complete map: a concurrent quotaLimit() reads the old map or the new one, never a partly updated one
+        quotaMap = newQuotaMap;
+        // Only after the swap: a reset makes Kafka call quotaLimit() again for the clients it already tracks
+        newQuotaMap.forEach((quotaType, quota) -> {
+            if (Double.compare(quota.bound(), oldQuotaMap.get(quotaType).bound()) != 0) {
+                requireQuotaReset(quotaType);
+            }
+        });
+        log.info("Reconfigured quota callback with {}", newQuotaMap);
     }
 
     private void scheduleStorageCheck(StaticQuotaConfig config, Optional<Long> availableBytesLimitConfig, Optional<Double> availableRatioLimit, long storageCheckInterval) {
@@ -198,7 +259,7 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
             log.info("Available ratio limit {}", availableRatioLimit.get());
         }
         FixedDurationExpiryPolicy expiryPolicy = new FixedDurationExpiryPolicy(clock, config.getThrottleFactorValidityDuration());
-        final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> resetQuota.add(ClientQuotaType.PRODUCE), expiryPolicy, config.getFallbackThrottleFactor(), defaultTags);
+        final PolicyBasedThrottle factorNotifier = new PolicyBasedThrottle(throttleFactorPolicy, () -> requireQuotaReset(ClientQuotaType.PRODUCE), expiryPolicy, config.getFallbackThrottleFactor(), defaultTags);
         throttleFactorSource = factorNotifier;
         VolumeObserver observer = new CachingVolumeObserver(factorNotifier, clock, config.getThrottleFactorValidityDuration(), defaultTags);
         Runnable volumeSource = volumeSourceBuilder.withConfig(config).withVolumeObserver(observer).withDefaultTags(defaultTags).build();
@@ -281,15 +342,15 @@ public class StaticQuotaCallback implements ClientQuotaCallback {
                 .replaceAll("\\$$", ""); // $ is only illegal as a trailing character as it is used to denote inner classes.
     }
 
-    private static class ClientQuotaGauge extends Gauge<Double> {
-        private final Quota quota;
+    private class ClientQuotaGauge extends Gauge<Double> {
+        private final ClientQuotaType quotaType;
 
-        public ClientQuotaGauge(Quota quota) {
-            this.quota = quota;
+        public ClientQuotaGauge(ClientQuotaType quotaType) {
+            this.quotaType = quotaType;
         }
 
         public Double value() {
-            return quota.bound();
+            return quotaMap.get(quotaType).bound();
         }
     }
 }
