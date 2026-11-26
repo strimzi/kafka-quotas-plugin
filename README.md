@@ -3,6 +3,7 @@
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.strimzi/kafka-quotas-plugin/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.strimzi/kafka-quotas-plugin)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 [![Twitter Follow](https://img.shields.io/twitter/follow/strimziio?style=social)](https://twitter.com/strimziio)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fstrimzi%2Fkafka-quotas-plugin.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fstrimzi%2Fkafka-quotas-plugin?ref=badge_shield)
 
 # Quota Plugin for Apache Kafka®
 
@@ -122,3 +123,7 @@ Run it locally (make sure your server.properties enables the reporter):
 ```
 CLASSPATH=/path/to/target/kafka-quotas-plugin.jar ./bin/kafka-server-start.sh server.properties
 ```
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fstrimzi%2Fkafka-quotas-plugin.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fstrimzi%2Fkafka-quotas-plugin?ref=badge_large)
